@@ -4,28 +4,93 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crash Cart & Defibrillator Daily Check</title>
+    
+    <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/pdf-lib@1.17.5/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
     <style>
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .checkbox-cell { text-align: center; vertical-align: middle; }
+        
+        /* Drag and Drop Calibration Markers */
+        .drag-marker {
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            background-color: rgba(37, 99, 235, 0.9); /* Blue */
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            cursor: grab;
+            transform: translate(-50%, -50%);
+            user-select: none;
+            touch-action: none; /* Prevents scrolling while dragging on mobile */
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            border: 2px solid white;
+        }
+        .drag-marker:active { cursor: grabbing; transform: translate(-50%, -50%) scale(1.1); }
+        .drag-marker.row-marker { background-color: rgba(220, 38, 38, 0.9); } /* Red for Row 2 */
+        .drag-marker.cb-marker { width: 22px; height: 22px; font-size: 9px; background-color: rgba(16, 185, 129, 0.9); } /* Green for Checkboxes */
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800 min-h-screen font-sans flex flex-col">
+<body class="bg-gray-50 text-gray-800 min-h-screen font-sans flex flex-col relative">
+
+    <!-- LOGIN OVERLAY -->
+    <div id="loginOverlay" class="fixed inset-0 bg-gray-100 z-50 flex items-center justify-center transition-opacity duration-300">
+        <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-sm border border-gray-200">
+            <div class="text-center mb-6">
+                <i class="fa-solid fa-truck-medical text-4xl text-blue-700 mb-2"></i>
+                <h2 class="text-2xl font-bold text-gray-800">Crash Cart Tracker</h2>
+                <p class="text-sm text-gray-500 mt-1">Please sign in to access records.</p>
+            </div>
+            
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fa-solid fa-envelope text-gray-400"></i></div>
+                        <input type="email" id="loginEmail" required class="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fa-solid fa-lock text-gray-400"></i></div>
+                        <input type="password" id="loginPassword" required class="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div id="loginError" class="text-red-500 text-sm font-medium hidden text-center bg-red-50 p-2 rounded"></div>
+                <button type="submit" id="loginSubmitBtn" class="w-full bg-blue-700 text-white font-bold py-2.5 px-4 rounded-md hover:bg-blue-800 transition-colors mt-2 shadow-sm">
+                    Log In
+                </button>
+            </form>
+        </div>
+    </div>
 
     <!-- Header -->
     <header class="bg-blue-800 text-white shadow-md">
         <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold"><i class="fa-solid fa-truck-medical mr-2"></i> Crash Cart Tracker</h1>
-            <div id="auth-status" class="text-sm font-medium text-yellow-300">Connecting to Database...</div>
+            <h1 class="text-xl font-bold flex items-center"><i class="fa-solid fa-truck-medical mr-2"></i> Crash Cart Tracker</h1>
+            <div class="flex items-center gap-4">
+                <div id="auth-status" class="text-sm font-medium text-yellow-300">Checking Auth...</div>
+                <button id="logoutBtn" class="hidden bg-blue-900 hover:bg-red-600 text-white py-1.5 px-3 rounded text-sm font-medium transition-colors border border-blue-700 shadow-sm">
+                    <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i> Logout
+                </button>
+            </div>
         </div>
         <!-- Navigation -->
-        <nav class="max-w-5xl mx-auto px-4 flex space-x-1 overflow-x-auto">
-            <button id="tab-btn-log" class="tab-btn px-4 py-2 bg-blue-700 text-white rounded-t-md font-semibold focus:outline-none transition-colors border-b-4 border-white">Daily Log</button>
-            <button id="tab-btn-review" class="tab-btn px-4 py-2 hover:bg-blue-700 text-blue-100 rounded-t-md font-semibold focus:outline-none transition-colors border-b-4 border-transparent">Monthly Review</button>
-            <button id="tab-btn-settings" class="tab-btn px-4 py-2 hover:bg-blue-700 text-blue-100 rounded-t-md font-semibold focus:outline-none transition-colors border-b-4 border-transparent">Settings & Alerts</button>
+        <nav class="max-w-5xl mx-auto px-4 flex space-x-1 overflow-x-auto mt-2">
+            <button id="tab-btn-log" class="tab-btn px-4 py-2 bg-blue-700 text-white rounded-t-md font-semibold transition-colors border-b-4 border-white">Daily Log</button>
+            <button id="tab-btn-review" class="tab-btn px-4 py-2 hover:bg-blue-700 text-blue-100 rounded-t-md font-semibold transition-colors border-b-4 border-transparent">Monthly Review</button>
+            <button id="tab-btn-settings" class="tab-btn px-4 py-2 hover:bg-blue-700 text-blue-100 rounded-t-md font-semibold transition-colors border-b-4 border-transparent">Settings & Alerts</button>
         </nav>
     </header>
 
@@ -37,12 +102,18 @@
             <span id="toast-msg">Success!</span>
         </div>
 
-        <!-- Custom Modal -->
-        <div id="customModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
-            <div class="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
-                <h3 id="modalTitle" class="text-lg font-bold mb-2">Message</h3>
-                <p id="modalMessage" class="text-gray-600 mb-6">Details here...</p>
-                <div class="flex justify-end gap-2">
+        <!-- Custom Modal (For alerts & PDF Preview) -->
+        <div id="customModal" class="fixed inset-0 bg-black bg-opacity-60 hidden flex items-center justify-center z-50 p-4">
+            <div id="modalContainer" class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-auto flex flex-col max-h-full">
+                <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+                    <h3 id="modalTitle" class="text-lg font-bold text-gray-800">Message</h3>
+                    <button id="modalCloseIcon" class="text-gray-500 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                <div id="modalBody" class="p-4 overflow-y-auto flex-grow">
+                    <p id="modalMessage" class="text-gray-600 mb-2">Details here...</p>
+                    <iframe id="pdfPreviewFrame" class="hidden w-full h-[60vh] border rounded" src=""></iframe>
+                </div>
+                <div class="p-4 border-t flex justify-end gap-2 bg-gray-50 rounded-b-lg">
                     <button id="modalCancelBtn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 hidden">Cancel</button>
                     <button id="modalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">OK</button>
                 </div>
@@ -56,93 +127,55 @@
                 
                 <form id="entryForm" class="space-y-6">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        
-                        <!-- Location / Unit -->
                         <div>
                             <label for="unit" class="block text-sm font-medium text-gray-700 mb-1">Unit / Location</label>
-                            <select id="unit" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border bg-white">
+                            <select id="unit" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 p-2 border bg-white">
                                 <option value="" disabled selected>Select Location...</option>
-                                <option value="a">a</option>
-                                <option value="b">b</option>
-                                <option value="c">c</option>
-                                <option value="d">d</option>
+                                <option value="a">a</option><option value="b">b</option>
+                                <option value="c">c</option><option value="d">d</option>
                                 <option value="mobile">mobile</option>
                             </select>
                         </div>
-
-                        <!-- Date -->
                         <div>
                             <label for="entryDate" class="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                            <input type="date" id="entryDate" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border">
+                            <input type="date" id="entryDate" required class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
                         </div>
-
-                        <!-- Lock 1 -->
                         <div>
                             <label for="lock1" class="block text-sm font-medium text-gray-700 mb-1">Lock #1 (Pharmacy)</label>
-                            <input type="text" id="lock1" list="lock1-suggestions" required placeholder="e.g. 12345*" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border">
+                            <input type="text" id="lock1" list="lock1-suggestions" required placeholder="e.g. 12345*" class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
                             <datalist id="lock1-suggestions"></datalist>
                         </div>
-
-                        <!-- Lock 2 -->
                         <div>
                             <label for="lock2" class="block text-sm font-medium text-gray-700 mb-1">Lock #2</label>
-                            <input type="text" id="lock2" list="lock2-suggestions" required placeholder="e.g. 67891*" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border">
+                            <input type="text" id="lock2" list="lock2-suggestions" required placeholder="e.g. 67891*" class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
                             <datalist id="lock2-suggestions"></datalist>
                         </div>
-
-                        <!-- Exp Date -->
                         <div>
                             <label for="expDate" class="block text-sm font-medium text-gray-700 mb-1">Earliest Exp. Date</label>
-                            <input type="text" id="expDate" required placeholder="MM/DD/YY" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border">
+                            <input type="text" id="expDate" required placeholder="MM/DD/YY" class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
                         </div>
-                        
-                        <!-- Staff Name -->
                         <div>
                             <label for="staffName" class="block text-sm font-medium text-gray-700 mb-1">Checking Equipment (Print Name)</label>
-                            <input type="text" id="staffName" list="staff-suggestions" required placeholder="Jane Doe, RN" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border">
+                            <input type="text" id="staffName" list="staff-suggestions" required placeholder="Jane Doe, RN" class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
                             <datalist id="staff-suggestions"></datalist>
                         </div>
                     </div>
 
-                    <!-- Equipment Checks -->
                     <div class="mt-8 border-t pt-6">
                         <h3 class="text-lg font-semibold mb-4">Equipment Checks (Check all that apply)</h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-md border border-gray-200">
-                            <label class="flex items-center space-x-3 cursor-pointer">
-                                <input type="checkbox" id="cb1" class="form-checkbox h-5 w-5 text-blue-600 rounded border-gray-300">
-                                <span class="text-gray-700">Manual Resus. Bag (Ped/Adult)</span>
-                            </label>
-                            <label class="flex items-center space-x-3 cursor-pointer">
-                                <input type="checkbox" id="cb2" class="form-checkbox h-5 w-5 text-blue-600 rounded border-gray-300">
-                                <span class="text-gray-700">Extra 2 Pack Paper</span>
-                            </label>
-                            <label class="flex items-center space-x-3 cursor-pointer">
-                                <input type="checkbox" id="cb3" class="form-checkbox h-5 w-5 text-blue-600 rounded border-gray-300">
-                                <span class="text-gray-700">Roll of Electrodes</span>
-                            </label>
-                            <label class="flex items-center space-x-3 cursor-pointer">
-                                <input type="checkbox" id="cb4" class="form-checkbox h-5 w-5 text-blue-600 rounded border-gray-300">
-                                <span class="text-gray-700">EKG Quick Combo Pads</span>
-                            </label>
-                            <label class="flex items-center space-x-3 cursor-pointer">
-                                <input type="checkbox" id="cb5" class="form-checkbox h-5 w-5 text-blue-600 rounded border-gray-300">
-                                <span class="text-gray-700">Weight Estimation Tape (Ped)</span>
-                            </label>
-                            <label class="flex items-center space-x-3 cursor-pointer">
-                                <input type="checkbox" id="cb6" class="form-checkbox h-5 w-5 text-blue-600 rounded border-gray-300">
-                                <span class="text-gray-700">Code Binder (Ped)</span>
-                            </label>
-                            <label class="flex items-center space-x-3 cursor-pointer">
-                                <input type="checkbox" id="cb7" class="form-checkbox h-5 w-5 text-blue-600 rounded border-gray-300">
-                                <span class="text-gray-700">Defibrillator Power & O2 Tank > 2000 psi</span>
-                            </label>
+                            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" id="cb1" class="form-checkbox h-5 w-5 text-blue-600"><span class="text-gray-700">Manual Resus. Bag (Ped/Adult)</span></label>
+                            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" id="cb2" class="form-checkbox h-5 w-5 text-blue-600"><span class="text-gray-700">Extra 2 Pack Paper</span></label>
+                            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" id="cb3" class="form-checkbox h-5 w-5 text-blue-600"><span class="text-gray-700">Roll of Electrodes</span></label>
+                            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" id="cb4" class="form-checkbox h-5 w-5 text-blue-600"><span class="text-gray-700">EKG Quick Combo Pads</span></label>
+                            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" id="cb5" class="form-checkbox h-5 w-5 text-blue-600"><span class="text-gray-700">Weight Estimation Tape (Ped)</span></label>
+                            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" id="cb6" class="form-checkbox h-5 w-5 text-blue-600"><span class="text-gray-700">Code Binder (Ped)</span></label>
+                            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" id="cb7" class="form-checkbox h-5 w-5 text-blue-600"><span class="text-gray-700">Defib. Power & O2 Tank > 2000 psi</span></label>
                         </div>
                     </div>
 
                     <div class="flex justify-end pt-4">
-                        <button type="submit" id="saveBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-md shadow focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
-                            <i class="fa-solid fa-save mr-2"></i> Save Entry
-                        </button>
+                        <button type="submit" id="saveBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-md shadow transition-colors"><i class="fa-solid fa-save mr-2"></i> Save Entry</button>
                     </div>
                 </form>
             </div>
@@ -151,7 +184,7 @@
         <!-- ==================== TAB: MONTHLY REVIEW ==================== -->
         <div id="review" class="tab-content">
             <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Filter Records & Export</h2>
+                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Review & Export Records</h2>
                 
                 <div class="flex flex-wrap gap-4 items-end mb-6">
                     <div>
@@ -172,21 +205,18 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Unit</label>
                         <select id="filterUnit" class="rounded-md border-gray-300 shadow-sm p-2 border bg-white">
-                            <option value="a">a</option>
-                            <option value="b">b</option>
-                            <option value="c">c</option>
-                            <option value="d">d</option>
+                            <option value="a">a</option><option value="b">b</option>
+                            <option value="c">c</option><option value="d">d</option>
                             <option value="mobile">mobile</option>
                         </select>
                     </div>
-                    <div>
-                        <button id="applyFilterBtn" class="bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-2 px-4 border border-gray-300 rounded shadow-sm">
-                            <i class="fa-solid fa-filter mr-1"></i> Apply Filter
+                    
+                    <div class="ml-auto flex gap-2 w-full sm:w-auto mt-4 sm:mt-0">
+                        <button id="previewPdfBtn" class="flex-1 sm:flex-none bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
+                            <i class="fa-solid fa-eye mr-2"></i> Preview PDF
                         </button>
-                    </div>
-                    <div class="ml-auto flex gap-2">
-                        <button id="exportPdfBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center">
-                            <i class="fa-solid fa-file-pdf mr-2"></i> Export to PDF
+                        <button id="exportPdfBtn" class="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
+                            <i class="fa-solid fa-file-pdf mr-2"></i> Download PDF
                         </button>
                     </div>
                 </div>
@@ -195,13 +225,13 @@
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-3 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Day</th>
-                                <th class="px-3 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Lock #1</th>
-                                <th class="px-3 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Lock #2</th>
-                                <th class="px-3 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Exp Date</th>
-                                <th class="px-3 py-3 text-center font-medium text-gray-500 uppercase tracking-wider" title="Checks completed">Checks</th>
-                                <th class="px-3 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Staff</th>
-                                <th class="px-3 py-3 text-center font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                <th class="px-3 py-3 text-left font-medium text-gray-500 uppercase">Day</th>
+                                <th class="px-3 py-3 text-left font-medium text-gray-500 uppercase">Lock #1</th>
+                                <th class="px-3 py-3 text-left font-medium text-gray-500 uppercase">Lock #2</th>
+                                <th class="px-3 py-3 text-left font-medium text-gray-500 uppercase">Exp Date</th>
+                                <th class="px-3 py-3 text-center font-medium text-gray-500 uppercase">Checks</th>
+                                <th class="px-3 py-3 text-left font-medium text-gray-500 uppercase">Staff</th>
+                                <th class="px-3 py-3 text-center font-medium text-gray-500 uppercase">Action</th>
                             </tr>
                         </thead>
                         <tbody id="dataTable" class="bg-white divide-y divide-gray-200">
@@ -212,75 +242,61 @@
             </div>
         </div>
 
-        <!-- ==================== TAB: SETTINGS & ALERTS ==================== -->
+        <!-- ==================== TAB: SETTINGS ==================== -->
         <div id="settings" class="tab-content">
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- PDF Upload & Calibration -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                    <h2 class="text-xl font-bold mb-4 border-b pb-2"><i class="fa-solid fa-file-invoice mr-2"></i>PDF Template Settings</h2>
-                    <p class="text-sm text-gray-600 mb-4">Upload the blank PDF of your form. We will save it locally and draw entries directly on top of it when exporting.</p>
-                    
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Upload Blank PDF Template</label>
-                        <input type="file" id="pdfUploader" accept="application/pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border p-1 rounded-md">
-                        <div id="pdfStatus" class="mt-2 text-sm font-medium text-red-600">Status: No Template Loaded</div>
-                    </div>
+            <!-- Webhooks and Automation -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+                <h2 class="text-xl font-bold mb-4 border-b pb-2"><i class="fa-solid fa-bell mr-2"></i>Automation & Alerts</h2>
+                <p class="text-sm text-gray-600 mb-4">
+                    The app runs a background check every minute. If it is <strong>08:30 AM</strong>, it verifies if an entry exists for the previous day. If missing, it will trigger the webhook URL below.
+                </p>
+                <div class="mb-4">
+                    <label for="webhookUrl" class="block text-sm font-medium text-gray-700 mb-1">Webhook URL (Make.com, Zapier)</label>
+                    <input type="url" id="webhookUrl" placeholder="https://hook.make.com/..." class="w-full rounded-md border-gray-300 p-2 border">
+                </div>
+                <div class="flex gap-2">
+                    <button id="saveWebhookBtn" class="bg-gray-800 text-white text-sm font-semibold py-2 px-4 rounded">Save Webhook</button>
+                    <button id="testWebhookBtn" class="bg-purple-600 text-white text-sm font-semibold py-2 px-4 rounded"><i class="fa-solid fa-flask mr-1"></i> Test Trigger</button>
+                </div>
+            </div>
 
-                    <h3 class="text-md font-semibold mt-6 mb-2">Calibration Offsets</h3>
-                    <p class="text-xs text-gray-500 mb-4">Adjust these if the text isn't aligning with the boxes on your specific PDF scan. (Higher Y = lower on page, Higher X = further right)</p>
-                    
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-medium text-gray-700">Start Y (Row 1)</label>
-                            <input type="number" id="calStartY" class="w-full rounded-md border-gray-300 p-1 border text-sm" value="550">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-700">Row Height</label>
-                            <input type="number" id="calRowHeight" step="0.1" class="w-full rounded-md border-gray-300 p-1 border text-sm" value="15.5">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-700">Date Col X</label>
-                            <input type="number" id="calDateX" class="w-full rounded-md border-gray-300 p-1 border text-sm" value="50">
-                        </div>
-                         <div>
-                            <label class="block text-xs font-medium text-gray-700">Staff Col X</label>
-                            <input type="number" id="calStaffX" class="w-full rounded-md border-gray-300 p-1 border text-sm" value="520">
-                        </div>
-                    </div>
-                    <div class="mt-4">
-                        <button id="saveCalBtn" class="bg-gray-800 hover:bg-gray-900 text-white text-sm font-semibold py-2 px-4 rounded shadow">Save Calibration</button>
-                    </div>
+            <!-- Visual PDF Calibration -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h2 class="text-xl font-bold"><i class="fa-solid fa-ruler-combined mr-2"></i>PDF Drag & Drop Calibrator</h2>
+                    <div id="pdfStatus" class="text-sm font-medium text-red-600">No Template Loaded</div>
+                </div>
+                
+                <p class="text-sm text-gray-600 mb-4">
+                    <strong>Step 1:</strong> Upload your blank PDF. <br>
+                    <strong>Step 2:</strong> Drag the blue dots to align with the columns on <strong>Day 1 (Row 1)</strong>.<br>
+                    <strong>Step 3:</strong> Drag the red dot down to <strong>Day 2 (Row 2)</strong> to set the row spacing.<br>
+                    <strong>Step 4:</strong> Click Save!
+                </p>
+
+                <div class="mb-4 flex gap-4 items-center">
+                    <input type="file" id="pdfUploader" accept="application/pdf" class="block text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border p-1 rounded-md">
+                    <button id="saveVisualCalBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded shadow hidden">Save Positions</button>
                 </div>
 
-                <!-- Webhooks and Automation -->
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                    <h2 class="text-xl font-bold mb-4 border-b pb-2"><i class="fa-solid fa-bell mr-2"></i>Automation & Alerts</h2>
-                    <p class="text-sm text-gray-600 mb-4">
-                        The app runs an internal check every minute. If it's <strong>08:30 AM</strong>, it verifies if an entry exists for the previous day. If missing, it will trigger the webhook URL below.
-                    </p>
-                    
-                    <div class="mb-4">
-                        <label for="webhookUrl" class="block text-sm font-medium text-gray-700 mb-1">Webhook URL (Make.com, Zapier, IFTTT)</label>
-                        <input type="url" id="webhookUrl" placeholder="https://hook.make.com/..." class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border">
-                        <p class="text-xs text-gray-500 mt-1">Leave blank to disable notifications.</p>
-                    </div>
-                    
-                    <div class="flex gap-2 mt-4">
-                        <button id="saveWebhookBtn" class="bg-gray-800 hover:bg-gray-900 text-white text-sm font-semibold py-2 px-4 rounded shadow">Save Webhook</button>
-                        <button id="testWebhookBtn" class="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold py-2 px-4 rounded shadow"><i class="fa-solid fa-flask mr-1"></i> Test Run Check</button>
+                <!-- Canvas Area -->
+                <div id="pdfWorkspace" class="relative hidden border-2 border-dashed border-gray-300 bg-gray-100 overflow-hidden w-full max-w-[800px] mx-auto" style="min-height: 500px;">
+                    <canvas id="pdfCanvas" class="block w-full h-auto"></canvas>
+                    <div id="markerContainer" class="absolute inset-0">
+                        <!-- Markers injected via JS -->
                     </div>
                 </div>
+                
             </div>
         </div>
 
     </main>
 
-    <!-- Firebase Scripts (Using specific version CDNs compatible with standard HTML) -->
+    <!-- Firebase Scripts -->
     <script type="module">
-        // Import Firebase modules securely from CDN
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, doc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ==============================================================================
@@ -303,27 +319,47 @@
         // State Management
         let currentUser = null;
         let allEntries = [];
+        let unsubscribeSnapshot = null;
+        
+        // PDF.js Configuration
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        let calCanvasScale = 1;
+        let calPdfWidth = 0;
+        let calPdfHeight = 0;
 
-        // UI Helpers
+        // --- UI Helpers ---
         function showToast(message, isError = false) {
             const toast = document.getElementById('toast');
-            const msg = document.getElementById('toast-msg');
-            msg.textContent = message;
+            toast.querySelector('#toast-msg').textContent = message;
             toast.className = `fixed top-4 right-4 px-6 py-3 rounded-md shadow-lg transform transition-all duration-300 z-50 ${isError ? 'bg-red-500' : 'bg-green-500'} text-white`;
             setTimeout(() => { toast.classList.remove('translate-x-full', 'opacity-0'); }, 10);
             setTimeout(() => { toast.classList.add('translate-x-full', 'opacity-0'); }, 3000);
         }
 
-        function showModal(title, message, onConfirm = null) {
+        function showModal(title, message, isPreview = false, onConfirm = null) {
             document.getElementById('modalTitle').textContent = title;
             document.getElementById('modalMessage').textContent = message;
             const modal = document.getElementById('customModal');
+            const container = document.getElementById('modalContainer');
             const confirmBtn = document.getElementById('modalConfirmBtn');
             const cancelBtn = document.getElementById('modalCancelBtn');
+            const iframe = document.getElementById('pdfPreviewFrame');
+            
+            if (isPreview) {
+                container.classList.replace('max-w-sm', 'max-w-4xl');
+                iframe.classList.remove('hidden');
+                document.getElementById('modalMessage').classList.add('hidden');
+            } else {
+                container.classList.replace('max-w-4xl', 'max-w-sm');
+                iframe.classList.add('hidden');
+                iframe.src = '';
+                document.getElementById('modalMessage').classList.remove('hidden');
+            }
             
             modal.classList.remove('hidden');
             
-            const close = () => { modal.classList.add('hidden'); };
+            const close = () => { modal.classList.add('hidden'); iframe.src=''; };
+            document.getElementById('modalCloseIcon').onclick = close;
             
             if (onConfirm) {
                 cancelBtn.classList.remove('hidden');
@@ -341,9 +377,7 @@
                 el.classList.remove('bg-blue-700', 'border-white', 'text-white');
                 el.classList.add('border-transparent', 'hover:bg-blue-700', 'text-blue-100');
             });
-            
             document.getElementById(tabId).classList.add('active');
-            
             const btn = document.getElementById('tab-btn-' + tabId);
             if(btn) {
                 btn.classList.add('bg-blue-700', 'border-white', 'text-white');
@@ -351,26 +385,32 @@
             }
         }
 
-        // Initialize UI Elements & Event Listeners
+        // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
             initDateFields();
             loadSettings();
             
-            // Wire up navigation tabs
+            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+            document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+
             document.getElementById('tab-btn-log').addEventListener('click', () => switchTab('log'));
             document.getElementById('tab-btn-review').addEventListener('click', () => switchTab('review'));
             document.getElementById('tab-btn-settings').addEventListener('click', () => switchTab('settings'));
             
-            // Wire up Buttons
-            document.getElementById('applyFilterBtn').addEventListener('click', renderTable);
-            document.getElementById('exportPdfBtn').addEventListener('click', exportToPDF);
-            document.getElementById('saveCalBtn').addEventListener('click', saveCalibration);
+            // Auto-update table on filter change
+            document.getElementById('filterMonth').addEventListener('change', renderTable);
+            document.getElementById('filterYear').addEventListener('change', renderTable);
+            document.getElementById('filterUnit').addEventListener('change', renderTable);
+            
+            document.getElementById('exportPdfBtn').addEventListener('click', () => generatePDF(true));
+            document.getElementById('previewPdfBtn').addEventListener('click', () => generatePDF(false));
+            
+            document.getElementById('saveVisualCalBtn').addEventListener('click', saveVisualCalibration);
             document.getElementById('saveWebhookBtn').addEventListener('click', saveWebhook);
             document.getElementById('testWebhookBtn').addEventListener('click', testWebhook);
             document.getElementById('pdfUploader').addEventListener('change', handlePDFUpload);
             document.getElementById('entryForm').addEventListener('submit', handleFormSubmit);
 
-            // Populate Year dropdowns
             const currentYear = new Date().getFullYear();
             const yearSelect = document.getElementById('filterYear');
             for(let i = currentYear - 2; i <= currentYear + 2; i++) {
@@ -380,156 +420,133 @@
                 if(i === currentYear) opt.selected = true;
                 yearSelect.appendChild(opt);
             }
+            document.getElementById('filterMonth').value = String(new Date().getMonth() + 1).padStart(2, '0');
 
-            // Set current month filter
-            const curMonthStr = String(new Date().getMonth() + 1).padStart(2, '0');
-            document.getElementById('filterMonth').value = curMonthStr;
-
-            // Start background checker
+            initDragAndDrop();
             startBackgroundCheck();
         });
 
-        // ------------------ Authentication & Data Loading ------------------
-        const initAuth = async () => {
-            try {
-                // Anonymous auth to secure the connection 
-                await signInAnonymously(auth);
-            } catch (error) {
-                console.error("Auth error:", error);
-                document.getElementById('auth-status').innerText = "Auth Failed (Enable Anonymous Login)";
-                document.getElementById('auth-status').classList.remove('text-yellow-300');
-                document.getElementById('auth-status').classList.add('text-red-300');
-            }
-        };
-
+        // --- Auth & DB Loading ---
         onAuthStateChanged(auth, (user) => {
+            const loginOverlay = document.getElementById('loginOverlay');
+            const authStatus = document.getElementById('auth-status');
+            const logoutBtn = document.getElementById('logoutBtn');
+
             if (user) {
                 currentUser = user;
-                document.getElementById('auth-status').innerText = "Database Connected";
-                document.getElementById('auth-status').classList.remove('text-yellow-300');
-                document.getElementById('auth-status').classList.add('text-green-300');
+                loginOverlay.classList.add('opacity-0', 'pointer-events-none');
+                setTimeout(() => loginOverlay.classList.add('hidden'), 300);
+                
+                authStatus.innerText = "Logged In";
+                authStatus.classList.replace('text-yellow-300', 'text-green-300');
+                logoutBtn.classList.remove('hidden');
+                
                 loadAllData();
             } else {
                 currentUser = null;
+                loginOverlay.classList.remove('hidden');
+                setTimeout(() => loginOverlay.classList.remove('opacity-0', 'pointer-events-none'), 10);
+                
+                authStatus.innerText = "Logged Out";
+                authStatus.classList.replace('text-green-300', 'text-yellow-300');
+                logoutBtn.classList.add('hidden');
+                
+                allEntries = [];
+                renderTable();
+                if (unsubscribeSnapshot) unsubscribeSnapshot();
             }
         });
 
-        initAuth();
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const pass = document.getElementById('loginPassword').value;
+            const btn = document.getElementById('loginSubmitBtn');
+            const err = document.getElementById('loginError');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Signing in...';
+            err.classList.add('hidden');
+
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+                document.getElementById('loginForm').reset();
+            } catch (error) {
+                err.textContent = "Invalid email or password.";
+                err.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Log In';
+            }
+        }
+
+        function handleLogout() {
+            signOut(auth).then(() => showToast("Logged out successfully")).catch(() => showToast("Error logging out", true));
+        }
 
         function loadAllData() {
             if (!currentUser) return;
-            
-            // GLOBAL COLLECTION: 'crashcart_logs'. This allows any device using the app to see all entries.
             const entriesRef = collection(db, 'crashcart_logs');
-            
-            onSnapshot(entriesRef, (snapshot) => {
+            unsubscribeSnapshot = onSnapshot(entriesRef, (snapshot) => {
                 allEntries = [];
-                snapshot.forEach(doc => {
-                    allEntries.push({ id: doc.id, ...doc.data() });
-                });
+                snapshot.forEach(doc => allEntries.push({ id: doc.id, ...doc.data() }));
                 updateSuggestions(allEntries);
-                renderTable(); // Refresh UI
-            }, (error) => {
-                console.error("Error fetching data:", error);
-                showToast("Error loading data from Firebase", true);
+                renderTable();
             });
         }
 
-        // ------------------ Core Functions ------------------
-        function initDateFields() {
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('entryDate').value = today;
-        }
+        // --- Core Entry Logic ---
+        function initDateFields() { document.getElementById('entryDate').value = new Date().toISOString().split('T')[0]; }
 
-        // ------------------ Form Handling & Autocomplete ------------------
         function updateSuggestions(data) {
-            const staffSet = new Set();
-            const lock1Set = new Set();
-            const lock2Set = new Set();
-
-            data.forEach(entry => {
-                if(entry.staffName) staffSet.add(entry.staffName);
-                if(entry.lock1) lock1Set.add(entry.lock1);
-                if(entry.lock2) lock2Set.add(entry.lock2);
-            });
-
+            const staffSet = new Set(), lock1Set = new Set(), lock2Set = new Set();
+            data.forEach(e => { if(e.staffName) staffSet.add(e.staffName); if(e.lock1) lock1Set.add(e.lock1); if(e.lock2) lock2Set.add(e.lock2); });
             const populate = (id, set) => {
                 const dl = document.getElementById(id);
-                if(!dl) return;
-                dl.innerHTML = '';
-                set.forEach(val => {
-                    const opt = document.createElement('option');
-                    opt.value = val;
-                    dl.appendChild(opt);
-                });
+                if(dl) { dl.innerHTML = ''; set.forEach(v => dl.appendChild(new Option(v, v))); }
             };
-
-            populate('staff-suggestions', staffSet);
-            populate('lock1-suggestions', lock1Set);
-            populate('lock2-suggestions', lock2Set);
+            populate('staff-suggestions', staffSet); populate('lock1-suggestions', lock1Set); populate('lock2-suggestions', lock2Set);
         }
 
         async function handleFormSubmit(e) {
             e.preventDefault();
-            if (!currentUser) {
-                showToast("Not connected to database.", true);
-                return;
-            }
+            if (!currentUser) return showToast("You must be logged in.", true);
 
             const btn = document.getElementById('saveBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
-
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
             const dateVal = document.getElementById('entryDate').value; 
             
             const entryData = {
                 unit: document.getElementById('unit').value,
                 date: dateVal,
-                day: parseInt(dateVal.split('-')[2], 10),
-                month: dateVal.split('-')[1],
-                year: dateVal.split('-')[0],
-                lock1: document.getElementById('lock1').value,
-                lock2: document.getElementById('lock2').value,
+                day: parseInt(dateVal.split('-')[2], 10), month: dateVal.split('-')[1], year: dateVal.split('-')[0],
+                lock1: document.getElementById('lock1').value, lock2: document.getElementById('lock2').value,
                 expDate: document.getElementById('expDate').value,
-                cb1: document.getElementById('cb1').checked,
-                cb2: document.getElementById('cb2').checked,
-                cb3: document.getElementById('cb3').checked,
-                cb4: document.getElementById('cb4').checked,
-                cb5: document.getElementById('cb5').checked,
-                cb6: document.getElementById('cb6').checked,
+                cb1: document.getElementById('cb1').checked, cb2: document.getElementById('cb2').checked,
+                cb3: document.getElementById('cb3').checked, cb4: document.getElementById('cb4').checked,
+                cb5: document.getElementById('cb5').checked, cb6: document.getElementById('cb6').checked,
                 cb7: document.getElementById('cb7').checked,
                 staffName: document.getElementById('staffName').value,
-                timestamp: Date.now(),
-                submittedBy: currentUser.uid // Tracking who submitted it
+                timestamp: Date.now(), submittedBy: currentUser.email
             };
 
             try {
-                const entriesRef = collection(db, 'crashcart_logs');
-                await addDoc(entriesRef, entryData);
-                
+                await addDoc(collection(db, 'crashcart_logs'), entryData);
                 showToast("Entry saved successfully!");
                 document.getElementById('entryForm').reset();
                 initDateFields(); 
-            } catch (error) {
-                console.error("Save error: ", error);
-                showToast("Error saving entry. Check console.", true);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-save mr-2"></i> Save Entry';
-            }
+            } catch (err) { showToast("Error saving.", true); } 
+            finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save mr-2"></i> Save Entry'; }
         }
 
-        // ------------------ Review Tab & Table Rendering ------------------
         function renderTable() {
             const tbody = document.getElementById('dataTable');
             tbody.innerHTML = '';
-
             const m = document.getElementById('filterMonth').value;
             const y = document.getElementById('filterYear').value;
             const u = document.getElementById('filterUnit').value;
 
-            const filtered = allEntries.filter(e => e.month === m && e.year === y && e.unit === u);
-            filtered.sort((a, b) => a.day - b.day);
+            const filtered = allEntries.filter(e => e.month === m && e.year === y && e.unit === u).sort((a, b) => a.day - b.day);
 
             if(filtered.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7" class="px-3 py-4 text-center text-gray-500">No entries found for ${m}/${y} in Unit ${u}</td></tr>`;
@@ -537,83 +554,262 @@
             }
 
             filtered.forEach(entry => {
-                const checksCount = [entry.cb1, entry.cb2, entry.cb3, entry.cb4, entry.cb5, entry.cb6, entry.cb7].filter(Boolean).length;
-                
+                const checks = [entry.cb1, entry.cb2, entry.cb3, entry.cb4, entry.cb5, entry.cb6, entry.cb7].filter(Boolean).length;
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="px-3 py-2 whitespace-nowrap">${entry.day}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-xs">${entry.lock1}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-xs">${entry.lock2}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-xs">${entry.expDate}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-center text-sm font-semibold ${checksCount === 7 ? 'text-green-600' : 'text-red-600'}">${checksCount}/7</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-center text-sm font-semibold ${checks === 7 ? 'text-green-600' : 'text-red-600'}">${checks}/7</td>
                     <td class="px-3 py-2 whitespace-nowrap text-xs">${entry.staffName}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-center">
-                        <button class="delete-btn text-red-500 hover:text-red-700 p-1" data-id="${entry.id}" title="Delete">
-                            <i class="fa-solid fa-trash"></i>
-                        </button>
-                    </td>
-                `;
+                        <button class="delete-btn text-red-500 hover:text-red-700 p-1" data-id="${entry.id}"><i class="fa-solid fa-trash"></i></button>
+                    </td>`;
                 tbody.appendChild(tr);
             });
 
-            // Attach delete listeners
             document.querySelectorAll('.delete-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const id = e.currentTarget.getAttribute('data-id');
-                    showModal("Delete Entry", "Are you sure you want to delete this entry?", async () => {
-                        try {
-                            await deleteDoc(doc(db, 'crashcart_logs', id));
-                            showToast("Entry deleted");
-                        } catch(err) {
-                            console.error("Delete error", err);
-                            showToast("Error deleting", true);
-                        }
+                    showModal("Delete Entry", "Are you sure you want to delete this entry?", false, async () => {
+                        await deleteDoc(doc(db, 'crashcart_logs', id));
+                        showToast("Entry deleted");
                     });
                 });
             });
         }
 
-        // ------------------ PDF Export Logic ------------------
+        // --- Drag & Drop PDF Calibration ---
+        let draggedMarker = null;
+        
+        function initDragAndDrop() {
+            const container = document.getElementById('markerContainer');
+            
+            // Pointer events handle both Mouse and Touch
+            container.addEventListener('pointerdown', (e) => {
+                if (e.target.classList.contains('drag-marker')) {
+                    draggedMarker = e.target;
+                    e.target.setPointerCapture(e.pointerId);
+                    e.preventDefault(); // Stop scrolling on mobile
+                }
+            });
+
+            container.addEventListener('pointermove', (e) => {
+                if (draggedMarker) {
+                    const rect = container.getBoundingClientRect();
+                    let x = e.clientX - rect.left;
+                    let y = e.clientY - rect.top;
+                    
+                    // Constrain within bounds
+                    x = Math.max(0, Math.min(x, rect.width));
+                    y = Math.max(0, Math.min(y, rect.height));
+                    
+                    // If it's a Row 1 marker, lock it to the Row 1 Y axis (mostly) to keep it clean, 
+                    // actually, let's let L1 dictate the master Y, and others just follow its Y visually.
+                    if (draggedMarker.id !== 'm_row2') {
+                        if (draggedMarker.id === 'm_lock1') {
+                            // Moving the master row 1 pin updates all row 1 pins' Y
+                            document.querySelectorAll('.row1-marker').forEach(m => m.style.top = `${y}px`);
+                        } else {
+                            // Lock Y to whatever L1 is at
+                            y = parseFloat(document.getElementById('m_lock1').style.top);
+                        }
+                    } else {
+                        // Row 2 marker is locked to L1's X coordinate, only goes up and down
+                        x = parseFloat(document.getElementById('m_lock1').style.left);
+                    }
+                    
+                    draggedMarker.style.left = `${x}px`;
+                    draggedMarker.style.top = `${y}px`;
+                }
+            });
+
+            container.addEventListener('pointerup', (e) => {
+                if(draggedMarker) { draggedMarker.releasePointerCapture(e.pointerId); draggedMarker = null; }
+            });
+            container.addEventListener('pointercancel', (e) => { draggedMarker = null; });
+        }
+
+        function createMarkers() {
+            const container = document.getElementById('markerContainer');
+            container.innerHTML = '';
+            
+            const defs = [
+                { id: 'm_lock1', label: 'L1', cls: 'row1-marker' },
+                { id: 'm_lock2', label: 'L2', cls: 'row1-marker' },
+                { id: 'm_exp', label: 'Exp', cls: 'row1-marker' },
+                { id: 'm_cb1', label: 'C1', cls: 'row1-marker cb-marker' },
+                { id: 'm_cb2', label: 'C2', cls: 'row1-marker cb-marker' },
+                { id: 'm_cb3', label: 'C3', cls: 'row1-marker cb-marker' },
+                { id: 'm_cb4', label: 'C4', cls: 'row1-marker cb-marker' },
+                { id: 'm_cb5', label: 'C5', cls: 'row1-marker cb-marker' },
+                { id: 'm_cb6', label: 'C6', cls: 'row1-marker cb-marker' },
+                { id: 'm_cb7', label: 'C7', cls: 'row1-marker cb-marker' },
+                { id: 'm_staff', label: 'Staff', cls: 'row1-marker' },
+                { id: 'm_row2', label: 'Row2', cls: 'row-marker' },
+            ];
+
+            defs.forEach(d => {
+                const el = document.createElement('div');
+                el.id = d.id;
+                el.className = `drag-marker ${d.cls}`;
+                el.textContent = d.label;
+                el.title = `Drag to position ${d.label}`;
+                container.appendChild(el);
+            });
+        }
+
+        function applyConfigToMarkers() {
+            const conf = getPDFConfig();
+            if (!calCanvasScale) return;
+            
+            // Math: HTML px = (PDF Coord / PDF Width) * Canvas Width
+            const canvasW = document.getElementById('pdfCanvas').offsetWidth;
+            const scaleX = canvasW / calPdfWidth;
+            
+            // PDF Y is from bottom. HTML Y is from top.
+            const canvasH = document.getElementById('pdfCanvas').offsetHeight;
+            const scaleY = canvasH / calPdfHeight;
+            
+            const toHtmlX = (pdfX) => pdfX * scaleX;
+            const toHtmlY = (pdfY) => (calPdfHeight - pdfY) * scaleY;
+            
+            const r1Y = toHtmlY(conf.startY);
+            const r2Y = toHtmlY(conf.startY - conf.rowHeight);
+            
+            const setPos = (id, x, y) => {
+                const el = document.getElementById(id);
+                if(el) { el.style.left = `${x}px`; el.style.top = `${y}px`; }
+            };
+
+            setPos('m_lock1', toHtmlX(conf.colLock1X), r1Y);
+            setPos('m_lock2', toHtmlX(conf.colLock2X), r1Y);
+            setPos('m_exp', toHtmlX(conf.colExpX), r1Y);
+            setPos('m_cb1', toHtmlX(conf.colCb1X), r1Y);
+            setPos('m_cb2', toHtmlX(conf.colCb2X), r1Y);
+            setPos('m_cb3', toHtmlX(conf.colCb3X), r1Y);
+            setPos('m_cb4', toHtmlX(conf.colCb4X), r1Y);
+            setPos('m_cb5', toHtmlX(conf.colCb5X), r1Y);
+            setPos('m_cb6', toHtmlX(conf.colCb6X), r1Y);
+            setPos('m_cb7', toHtmlX(conf.colCb7X), r1Y);
+            setPos('m_staff', toHtmlX(conf.colStaffX), r1Y);
+            
+            setPos('m_row2', toHtmlX(conf.colLock1X), r2Y);
+        }
+
+        function saveVisualCalibration() {
+            const canvasW = document.getElementById('pdfCanvas').offsetWidth;
+            const canvasH = document.getElementById('pdfCanvas').offsetHeight;
+            const scaleX = calPdfWidth / canvasW;
+            const scaleY = calPdfHeight / canvasH;
+            
+            const toPdfX = (elId) => parseFloat(document.getElementById(elId).style.left) * scaleX;
+            // PDF Y = Height - (HTML Y * scale)
+            const toPdfY = (elId) => calPdfHeight - (parseFloat(document.getElementById(elId).style.top) * scaleY);
+
+            const startY = toPdfY('m_lock1');
+            const row2Y = toPdfY('m_row2');
+            
+            const conf = {
+                startY: startY,
+                rowHeight: startY - row2Y,
+                colLock1X: toPdfX('m_lock1'),
+                colLock2X: toPdfX('m_lock2'),
+                colExpX: toPdfX('m_exp'),
+                colCb1X: toPdfX('m_cb1'), colCb2X: toPdfX('m_cb2'), colCb3X: toPdfX('m_cb3'),
+                colCb4X: toPdfX('m_cb4'), colCb5X: toPdfX('m_cb5'), colCb6X: toPdfX('m_cb6'), colCb7X: toPdfX('m_cb7'),
+                colStaffX: toPdfX('m_staff')
+            };
+            
+            localStorage.setItem('pdfConfig', JSON.stringify(conf));
+            showToast("Visual Calibration Saved!");
+        }
+
+        // --- PDF Generation & Display ---
         async function handlePDFUpload(e) {
             const file = e.target.files[0];
             if(!file) return;
-
             const reader = new FileReader();
             reader.onload = function(evt) {
                 const base64Str = evt.target.result.split(',')[1];
                 localStorage.setItem('basePdfBase64', base64Str);
-                checkPDFStatus();
-                showToast("PDF Template saved securely in browser!");
+                renderWorkspacePDF();
+                showToast("PDF Template loaded into workspace!");
             };
             reader.readAsDataURL(file);
         }
 
-        function checkPDFStatus() {
-            const hasPdf = !!localStorage.getItem('basePdfBase64');
-            const statusEl = document.getElementById('pdfStatus');
-            if(hasPdf) {
-                statusEl.textContent = "Status: Base Template Ready ✓";
-                statusEl.className = "mt-2 text-sm font-medium text-green-600";
-            } else {
-                statusEl.textContent = "Status: No Template Loaded. Please upload below.";
-                statusEl.className = "mt-2 text-sm font-medium text-red-600";
+        async function renderWorkspacePDF() {
+            const base64Str = localStorage.getItem('basePdfBase64');
+            if(!base64Str) return;
+            
+            document.getElementById('pdfStatus').textContent = "Template Loaded ✓";
+            document.getElementById('pdfStatus').className = "text-sm font-medium text-green-600";
+            document.getElementById('saveVisualCalBtn').classList.remove('hidden');
+            
+            const binary = atob(base64Str);
+            const array = new Uint8Array(binary.length);
+            for(let i=0; i<binary.length; i++) array[i] = binary.charCodeAt(i);
+            
+            try {
+                const doc = await pdfjsLib.getDocument(array).promise;
+                const page = await doc.getPage(1);
+                
+                const canvas = document.getElementById('pdfCanvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Determine scale based on container width
+                const containerW = document.getElementById('pdfWorkspace').offsetWidth;
+                const viewportRaw = page.getViewport({scale: 1.0});
+                calPdfWidth = viewportRaw.width;
+                calPdfHeight = viewportRaw.height;
+                
+                const scale = containerW / viewportRaw.width;
+                const viewport = page.getViewport({scale: scale});
+                
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                calCanvasScale = scale;
+                
+                await page.render({canvasContext: ctx, viewport: viewport}).promise;
+                
+                document.getElementById('pdfWorkspace').classList.remove('hidden');
+                createMarkers();
+                
+                // Wait a tick for CSS layout, then apply
+                setTimeout(applyConfigToMarkers, 100);
+            } catch(e) {
+                console.error("PDF Render Error", e);
             }
         }
 
-        async function exportToPDF() {
-            const btn = document.getElementById('exportPdfBtn');
+        function loadSettings() {
+            document.getElementById('webhookUrl').value = localStorage.getItem('webhookUrl') || '';
+            if(localStorage.getItem('basePdfBase64')) {
+                renderWorkspacePDF();
+            }
+        }
+
+        function getPDFConfig() {
+            const def = {
+                startY: 615, rowHeight: 14.5,
+                colLock1X: 135, colLock2X: 200, colExpX: 250,
+                colCb1X: 295, colCb2X: 330, colCb3X: 360, colCb4X: 395, colCb5X: 430, colCb6X: 460, colCb7X: 495,
+                colStaffX: 540
+            };
+            try { return JSON.parse(localStorage.getItem('pdfConfig')) || def; } catch(e) { return def; }
+        }
+
+        async function generatePDF(isDownload) {
             const base64Pdf = localStorage.getItem('basePdfBase64');
-            
-            if(!base64Pdf) {
-                showModal("Missing Template", "Please upload the blank PDF template in the Settings tab first before exporting.");
-                return;
-            }
-            if(!window.PDFLib) {
-                showToast("PDF Engine is still loading, please wait a moment.", true);
-                return;
-            }
+            if(!base64Pdf) return showModal("Missing Template", "Please upload the blank PDF template in the Settings tab first.");
+            if(!window.PDFLib) return showToast("PDF Engine loading...", true);
 
             const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+            
+            const btn = isDownload ? document.getElementById('exportPdfBtn') : document.getElementById('previewPdfBtn');
+            const ogText = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Generating...';
 
@@ -641,11 +837,11 @@
                 for (let day = 1; day <= 31; day++) {
                     const entry = filtered.find(e => e.day === day);
                     if (entry) {
-                        const rowY = conf.startY - (day * conf.rowHeight);
+                        const rowY = conf.startY - ((day - 1) * conf.rowHeight);
                         
-                        page.drawText(entry.lock1 || "", { x: conf.colLock1X, y: rowY, size: textSize, font });
-                        page.drawText(entry.lock2 || "", { x: conf.colLock2X, y: rowY, size: textSize, font });
-                        page.drawText(entry.expDate || "", { x: conf.colExpX, y: rowY, size: textSize, font });
+                        if(entry.lock1) page.drawText(entry.lock1, { x: conf.colLock1X, y: rowY, size: textSize, font });
+                        if(entry.lock2) page.drawText(entry.lock2, { x: conf.colLock2X, y: rowY, size: textSize, font });
+                        if(entry.expDate) page.drawText(entry.expDate, { x: conf.colExpX, y: rowY, size: textSize, font });
                         
                         if(entry.cb1) page.drawText(checkmark, { x: conf.colCb1X, y: rowY, size: textSize, font });
                         if(entry.cb2) page.drawText(checkmark, { x: conf.colCb2X, y: rowY, size: textSize, font });
@@ -655,116 +851,64 @@
                         if(entry.cb6) page.drawText(checkmark, { x: conf.colCb6X, y: rowY, size: textSize, font });
                         if(entry.cb7) page.drawText(checkmark, { x: conf.colCb7X, y: rowY, size: textSize, font });
                         
-                        page.drawText(entry.staffName || "", { x: conf.colStaffX, y: rowY, size: textSize, font });
+                        if(entry.staffName) page.drawText(entry.staffName, { x: conf.colStaffX, y: rowY, size: textSize, font });
                     }
                 }
 
                 const pdfBytesOut = await pdfDoc.save();
-                
                 const blob = new Blob([pdfBytesOut], { type: 'application/pdf' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = `CrashCart_${u}_${m}_${y}.pdf`;
-                link.click();
-                
-                showToast("PDF Exported Successfully!");
+                const blobUrl = URL.createObjectURL(blob);
+
+                if (isDownload) {
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = `CrashCart_${u}_${m}_${y}.pdf`;
+                    link.click();
+                    showToast("PDF Downloaded!");
+                } else {
+                    document.getElementById('pdfPreviewFrame').src = blobUrl + '#toolbar=0&navpanes=0&scrollbar=0';
+                    showModal(`Preview: Unit ${u} (${m}/${y})`, "", true);
+                }
 
             } catch (err) {
                 console.error(err);
-                showModal("Error", "Error generating PDF. Make sure you uploaded a valid PDF template.");
+                showModal("Error", "Error generating PDF. Make sure you uploaded a valid template.");
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-file-pdf mr-2"></i> Export to PDF';
+                btn.innerHTML = ogText;
             }
         }
 
-        // ------------------ Settings & Alerts ------------------
-        function loadSettings() {
-            checkPDFStatus();
-            document.getElementById('webhookUrl').value = localStorage.getItem('webhookUrl') || '';
-            
-            const conf = getPDFConfig();
-            document.getElementById('calStartY').value = conf.startY;
-            document.getElementById('calRowHeight').value = conf.rowHeight;
-            document.getElementById('calDateX').value = conf.colDateX; 
-            document.getElementById('calStaffX').value = conf.colStaffX;
-        }
-
-        function getPDFConfig() {
-            const def = {
-                startY: 615, 
-                rowHeight: 14.5, 
-                colDateX: 50,
-                colLock1X: 135,
-                colLock2X: 200,
-                colExpX: 250,
-                colCb1X: 295, colCb2X: 330, colCb3X: 360, colCb4X: 395, colCb5X: 430, colCb6X: 460, colCb7X: 495,
-                colStaffX: 540
-            };
-            try {
-                return JSON.parse(localStorage.getItem('pdfConfig')) || def;
-            } catch(e) { return def; }
-        }
-
-        function saveCalibration() {
-            const conf = getPDFConfig();
-            conf.startY = parseFloat(document.getElementById('calStartY').value);
-            conf.rowHeight = parseFloat(document.getElementById('calRowHeight').value);
-            conf.colStaffX = parseFloat(document.getElementById('calStaffX').value);
-            localStorage.setItem('pdfConfig', JSON.stringify(conf));
-            showToast("Calibration Saved!");
-        }
-
+        // --- Webhooks ---
         function saveWebhook() {
             localStorage.setItem('webhookUrl', document.getElementById('webhookUrl').value);
             showToast("Webhook URL Saved!");
         }
 
         function checkMissingEntry() {
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
             const yStr = yesterday.toISOString().split('T')[0]; 
 
-            const hasEntry = allEntries.some(e => e.date === yStr);
-            
-            if(!hasEntry) {
+            if(!allEntries.some(e => e.date === yStr)) {
                 const url = localStorage.getItem('webhookUrl');
                 if(url) {
-                    fetch(url, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        mode: 'no-cors',
-                        body: JSON.stringify({
-                            event: "missing_crashcart_entry",
-                            date: yStr,
-                            message: `Warning: No Crash Cart Check was logged for ${yStr}.`
-                        })
-                    }).then(() => console.log("Webhook triggered."))
-                      .catch(e => console.error("Webhook trigger failed", e));
+                    fetch(url, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ event: "missing_crashcart_entry", date: yStr }) });
                 }
-                return `Missing entry for ${yStr}. Webhook triggered (if configured).`;
+                return `Missing entry for ${yStr}. Webhook triggered.`;
             }
             return `All good. Entry found for ${yStr}.`;
         }
 
-        function testWebhook() {
-            const result = checkMissingEntry();
-            showModal("Test Complete", result);
-        }
+        function testWebhook() { showModal("Test Run", checkMissingEntry()); }
 
         function startBackgroundCheck() {
             setInterval(() => {
+                if (!currentUser) return;
                 const now = new Date();
-                const h = now.getHours();
-                const m = now.getMinutes();
                 const todayStr = now.toISOString().split('T')[0];
-                const lastCheck = localStorage.getItem('lastAutoCheck');
-
-                if (h === 8 && m === 30) {
-                    if(lastCheck !== todayStr) {
-                        checkMissingEntry();
-                        localStorage.setItem('lastAutoCheck', todayStr);
-                    }
+                if (now.getHours() === 8 && now.getMinutes() === 30 && localStorage.getItem('lastAutoCheck') !== todayStr) {
+                    checkMissingEntry();
+                    localStorage.setItem('lastAutoCheck', todayStr);
                 }
             }, 60000); 
         }
