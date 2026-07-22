@@ -7,35 +7,11 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <style>
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-
-        .drag-marker {
-            position: absolute;
-            width: 32px;
-            height: 32px;
-            background-color: rgba(37, 99, 235, 0.9);
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            font-weight: bold;
-            cursor: grab;
-            transform: translate(-50%, -50%);
-            user-select: none;
-            touch-action: none;
-            z-index: 10;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-            border: 2px solid white;
-        }
-        .drag-marker:active { cursor: grabbing; transform: translate(-50%, -50%) scale(1.15); }
-        .drag-marker.row-marker { background-color: rgba(220, 38, 38, 0.9); z-index: 11; } 
-        .drag-marker.cb-marker { width: 24px; height: 24px; font-size: 9px; background-color: rgba(16, 185, 129, 0.9); } 
 
         @media print {
             body * { visibility: hidden; }
@@ -182,6 +158,10 @@
                             <input type="date" id="entryDate" required class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
                         </div>
                         <div>
+                            <label for="entryTime" class="block text-sm font-medium text-gray-700 mb-1">Time of Check</label>
+                            <input type="time" id="entryTime" required class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                        </div>
+                        <div>
                             <label for="lock1" class="block text-sm font-medium text-gray-700 mb-1">Lock #1 (Pharmacy)</label>
                             <input type="text" id="lock1" list="lock1-suggestions" required placeholder="e.g. 12345*" class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
                             <datalist id="lock1-suggestions"></datalist>
@@ -256,6 +236,9 @@
                         <button id="viewMonthlyFormBtn" class="flex-1 md:flex-none bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
                             <i class="fa-solid fa-file-lines mr-2"></i> View Monthly Form
                         </button>
+                        <button id="downloadWordBtn" class="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
+                            <i class="fa-solid fa-file-word mr-2"></i> Download Word
+                        </button>
                         <button id="printMonthlyFormBtn" class="flex-1 md:flex-none bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
                             <i class="fa-solid fa-print mr-2"></i> Print/Save PDF
                         </button>
@@ -314,26 +297,29 @@
 
             <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <div class="flex justify-between items-center mb-4 border-b pb-2">
-                    <h2 class="text-xl font-bold"><i class="fa-solid fa-ruler-combined mr-2"></i>PDF Drag & Drop Calibrator</h2>
-                    <div id="pdfStatus" class="text-sm font-medium text-red-600">No Template Loaded</div>
+                    <h2 class="text-xl font-bold"><i class="fa-solid fa-file-word mr-2"></i>Word Template Manager</h2>
+                    <div id="docxStatus" class="text-sm font-medium text-gray-600">Checking template...</div>
                 </div>
 
+                <p class="text-sm text-gray-600 mb-2">
+                    Monthly Word forms are filled directly into an official <strong>.docx crash cart log</strong> — no PDF calibration needed.
+                    The app reads the day rows (1–31) in the document's table and writes each entry into the matching row automatically.
+                </p>
                 <p class="text-sm text-gray-600 mb-4">
-                    <strong>Step 1:</strong> Upload your blank PDF. <br>
-                    <strong>Step 2:</strong> Drag the blue and green dots to align inside the columns for <strong>Day 1 (Row 1)</strong>.<br>
-                    <strong>Step 3:</strong> Drag the red dot down to the Lock 1 box on <strong>Day 2 (Row 2)</strong> to teach it the row spacing.<br>
-                    <strong>Step 4:</strong> Click Save Positions!
+                    <strong>If the crash cart log is ever revised</strong>, simply upload the new Word file below.
+                    As long as it keeps the same day-row table layout (days 1–31 in the first column), it will work immediately — no recalibration required.
                 </p>
 
-                <div class="mb-4 flex gap-4 items-center">
-                    <input type="file" id="pdfUploader" accept="application/pdf" class="block text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border p-1 rounded-md">
-                    <button id="saveVisualCalBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded shadow hidden">Save Positions</button>
-                </div>
+                <div id="docxTemplateInfo" class="text-sm bg-gray-50 border rounded-md p-3 mb-4 text-gray-700"></div>
 
-                <div id="pdfWorkspace" class="relative hidden border-2 border-dashed border-gray-300 bg-gray-100 overflow-hidden w-full mx-auto" style="min-height: 500px; touch-action: none;">
-                    <canvas id="pdfCanvas" class="block w-full h-auto pointer-events-none"></canvas>
-                    <div id="markerContainer" class="absolute inset-0"></div>
+                <div class="mb-4 flex flex-wrap gap-4 items-center">
+                    <input type="file" id="docxUploader" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="block text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border p-1 rounded-md">
                 </div>
+                <div class="flex flex-wrap gap-2">
+                    <button id="downloadTemplateBtn" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded"><i class="fa-solid fa-download mr-1"></i> Download Current Template</button>
+                    <button id="resetTemplateBtn" class="bg-gray-700 hover:bg-gray-800 text-white text-sm font-semibold py-2 px-4 rounded hidden"><i class="fa-solid fa-rotate-left mr-1"></i> Reset to Default Template</button>
+                </div>
+                <div id="docxUploadError" class="hidden mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2"></div>
             </div>
         </div>
 
@@ -364,9 +350,6 @@
         let currentUser = null;
         let allEntries = [];
         let unsubscribeSnapshot = null;
-        let calCanvasScale = 1;
-        let calPdfWidth = 0;
-        let calPdfHeight = 0;
         let deleteIdPending = null;
 
         // ========== UI HELPERS ==========
@@ -419,10 +402,6 @@
 
         // ========== INIT ==========
         document.addEventListener('DOMContentLoaded', () => {
-            if (window.pdfjsLib) {
-                window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-            }
-
             initDateFields();
             loadSettings();
 
@@ -441,10 +420,12 @@
             document.getElementById('viewMonthlyFormBtn').addEventListener('click', () => generateMonthlyForm(false));
             document.getElementById('printMonthlyFormBtn').addEventListener('click', () => generateMonthlyForm(true));
 
-            document.getElementById('saveVisualCalBtn').addEventListener('click', saveVisualCalibration);
+            document.getElementById('downloadWordBtn').addEventListener('click', downloadMonthlyWord);
             document.getElementById('saveWebhookBtn').addEventListener('click', saveWebhook);
             document.getElementById('testWebhookBtn').addEventListener('click', () => { alert(checkMissingEntry()); });
-            document.getElementById('pdfUploader').addEventListener('change', handlePDFUpload);
+            document.getElementById('docxUploader').addEventListener('change', handleDocxUpload);
+            document.getElementById('resetTemplateBtn').addEventListener('click', resetDocxTemplate);
+            document.getElementById('downloadTemplateBtn').addEventListener('click', downloadCurrentTemplate);
             document.getElementById('entryForm').addEventListener('submit', handleFormSubmit);
             document.getElementById('modalCloseIcon').addEventListener('click', hideModal);
             document.getElementById('modalCancelBtn').addEventListener('click', hideModal);
@@ -459,7 +440,7 @@
             }
             document.getElementById('filterMonth').value = String(new Date().getMonth() + 1).padStart(2, '0');
 
-            initDragAndDrop();
+            refreshTemplateStatus();
             startBackgroundCheck();
         });
 
@@ -529,7 +510,11 @@
         }
 
         // ========== ENTRY LOGIC ==========
-        function initDateFields() { document.getElementById('entryDate').value = new Date().toISOString().split('T')[0]; }
+        function initDateFields() {
+            document.getElementById('entryDate').value = new Date().toISOString().split('T')[0];
+            const now = new Date();
+            document.getElementById('entryTime').value = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+        }
 
         function updateSuggestions(data) {
             const staffSet = new Set(), lock1Set = new Set(), lock2Set = new Set();
@@ -553,6 +538,7 @@
                 unit: document.getElementById('unit').value,
                 date: dateVal,
                 day: parseInt(dateVal.split('-')[2], 10), month: dateVal.split('-')[1], year: dateVal.split('-')[0],
+                time: document.getElementById('entryTime').value || '',
                 lock1: document.getElementById('lock1').value, lock2: document.getElementById('lock2').value,
                 expDate: document.getElementById('expDate').value,
                 cb1: document.getElementById('cb1').checked, cb2: document.getElementById('cb2').checked,
@@ -764,11 +750,19 @@
                     const snap = await getDoc(formRef);
                     if (!snap.exists()) {
                         const formHTML = generateMonthlyFormHTML(unit, month, year, allEntries);
+                        let formDocxBase64 = null;
+                        try {
+                            const blob = await buildMonthlyDocx(unit, month, year, allEntries);
+                            formDocxBase64 = await blobToBase64(blob);
+                        } catch (docxErr) {
+                            console.warn("Could not pre-generate Word form:", docxErr);
+                        }
                         const formData = {
                             unit: unit,
                             month: month,
                             year: year,
                             formHTML: formHTML,
+                            formDocxBase64: formDocxBase64,
                             entryCount: entries.length,
                             savedAt: Date.now(),
                             savedBy: currentUser.email,
@@ -829,6 +823,7 @@
                                 '<div class="font-bold text-blue-800">Unit ' + unit.toUpperCase() + '</div>' +
                                 '<div class="text-xs text-gray-500">' + f.entryCount + ' entries</div>' +
                                 '<div class="text-xs text-gray-400">Saved ' + dateStr + '</div>' +
+                                '<button class="mt-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-1 px-2 rounded" onclick="event.stopPropagation(); window.downloadSavedFormWord(\'' + f.id + '\')"><i class="fa-solid fa-file-word mr-1"></i>Word</button>' +
                                 '</div>';
                         });
                         html += '</div></div>';
@@ -875,174 +870,352 @@
             }
         };
 
-        // ========== DRAG & DROP CALIBRATION ==========
-        let draggedMarker = null;
-
-        function initDragAndDrop() {
-            const container = document.getElementById('markerContainer');
-            container.addEventListener('pointerdown', (e) => {
-                if (e.target.classList.contains('drag-marker')) {
-                    draggedMarker = e.target;
-                    e.target.setPointerCapture(e.pointerId);
-                    e.preventDefault(); 
-                }
-            });
-            container.addEventListener('pointermove', (e) => {
-                if (draggedMarker) {
-                    const rect = container.getBoundingClientRect();
-                    let x = e.clientX - rect.left;
-                    let y = e.clientY - rect.top;
-                    x = Math.max(0, Math.min(x, rect.width));
-                    y = Math.max(0, Math.min(y, rect.height));
-                    if (draggedMarker.id !== 'm_row2') {
-                        if (draggedMarker.id === 'm_lock1') {
-                            document.querySelectorAll('.row1-marker').forEach(m => m.style.top = y + 'px');
-                        } else {
-                            y = parseFloat(document.getElementById('m_lock1').style.top);
-                        }
-                    } else {
-                        x = parseFloat(document.getElementById('m_lock1').style.left);
-                    }
-                    draggedMarker.style.left = x + 'px';
-                    draggedMarker.style.top = y + 'px';
-                }
-            });
-            container.addEventListener('pointerup', (e) => {
-                if(draggedMarker) { draggedMarker.releasePointerCapture(e.pointerId); draggedMarker = null; }
-            });
-            container.addEventListener('pointercancel', () => { draggedMarker = null; });
-        }
-
-        function createMarkers() {
-            const container = document.getElementById('markerContainer');
-            container.innerHTML = '';
-            const defs = [
-                { id: 'm_lock1', label: 'L1', cls: 'row1-marker' },
-                { id: 'm_lock2', label: 'L2', cls: 'row1-marker' },
-                { id: 'm_exp', label: 'Exp', cls: 'row1-marker' },
-                { id: 'm_cb1', label: 'C1', cls: 'row1-marker cb-marker' },
-                { id: 'm_cb2', label: 'C2', cls: 'row1-marker cb-marker' },
-                { id: 'm_cb3', label: 'C3', cls: 'row1-marker cb-marker' },
-                { id: 'm_cb4', label: 'C4', cls: 'row1-marker cb-marker' },
-                { id: 'm_cb5', label: 'C5', cls: 'row1-marker cb-marker' },
-                { id: 'm_cb6', label: 'C6', cls: 'row1-marker cb-marker' },
-                { id: 'm_cb7', label: 'C7', cls: 'row1-marker cb-marker' },
-                { id: 'm_staff', label: 'Staff', cls: 'row1-marker' },
-                { id: 'm_row2', label: 'Row2', cls: 'row-marker' },
-            ];
-            defs.forEach(d => {
-                const el = document.createElement('div');
-                el.id = d.id; el.className = 'drag-marker ' + d.cls; el.textContent = d.label;
-                container.appendChild(el);
-            });
-        }
-
-        function applyConfigToMarkers() {
-            const conf = getPDFConfig();
-            if (!calCanvasScale) return;
-            const canvasW = document.getElementById('pdfCanvas').offsetWidth;
-            const scaleX = canvasW / calPdfWidth;
-            const canvasH = document.getElementById('pdfCanvas').offsetHeight;
-            const scaleY = canvasH / calPdfHeight;
-            const toHtmlX = (pdfX) => pdfX * scaleX;
-            const toHtmlY = (pdfY) => (calPdfHeight - pdfY) * scaleY;
-            const r1Y = toHtmlY(conf.startY);
-            const r2Y = toHtmlY(conf.startY - conf.rowHeight);
-            const setPos = (id, x, y) => {
-                const el = document.getElementById(id);
-                if(el) { el.style.left = x + 'px'; el.style.top = y + 'px'; }
-            };
-            setPos('m_lock1', toHtmlX(conf.colLock1X), r1Y);
-            setPos('m_lock2', toHtmlX(conf.colLock2X), r1Y);
-            setPos('m_exp', toHtmlX(conf.colExpX), r1Y);
-            setPos('m_cb1', toHtmlX(conf.colCb1X), r1Y);
-            setPos('m_cb2', toHtmlX(conf.colCb2X), r1Y);
-            setPos('m_cb3', toHtmlX(conf.colCb3X), r1Y);
-            setPos('m_cb4', toHtmlX(conf.colCb4X), r1Y);
-            setPos('m_cb5', toHtmlX(conf.colCb5X), r1Y);
-            setPos('m_cb6', toHtmlX(conf.colCb6X), r1Y);
-            setPos('m_cb7', toHtmlX(conf.colCb7X), r1Y);
-            setPos('m_staff', toHtmlX(conf.colStaffX), r1Y);
-            setPos('m_row2', toHtmlX(conf.colLock1X), r2Y);
-        }
-
-        function saveVisualCalibration() {
-            const canvasW = document.getElementById('pdfCanvas').offsetWidth;
-            const canvasH = document.getElementById('pdfCanvas').offsetHeight;
-            const scaleX = calPdfWidth / canvasW;
-            const scaleY = calPdfHeight / canvasH;
-            const toPdfX = (elId) => parseFloat(document.getElementById(elId).style.left) * scaleX;
-            const toPdfY = (elId) => calPdfHeight - (parseFloat(document.getElementById(elId).style.top) * scaleY);
-            const startY = toPdfY('m_lock1');
-            const row2Y = toPdfY('m_row2');
-            const conf = {
-                startY: startY, rowHeight: startY - row2Y,
-                colLock1X: toPdfX('m_lock1'), colLock2X: toPdfX('m_lock2'), colExpX: toPdfX('m_exp'),
-                colCb1X: toPdfX('m_cb1'), colCb2X: toPdfX('m_cb2'), colCb3X: toPdfX('m_cb3'),
-                colCb4X: toPdfX('m_cb4'), colCb5X: toPdfX('m_cb5'), colCb6X: toPdfX('m_cb6'), colCb7X: toPdfX('m_cb7'),
-                colStaffX: toPdfX('m_staff')
-            };
-            localStorage.setItem('pdfConfig', JSON.stringify(conf));
-            showToast("Visual Calibration Saved!");
-        }
-
-        async function handlePDFUpload(e) {
-            const file = e.target.files[0];
-            if(!file) return;
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                const base64Str = evt.target.result.split(',')[1];
-                localStorage.setItem('basePdfBase64', base64Str);
-                renderWorkspacePDF();
-                showToast("PDF Template loaded into workspace!");
-            };
-            reader.readAsDataURL(file);
-        }
-
-        async function renderWorkspacePDF() {
-            const base64Str = localStorage.getItem('basePdfBase64');
-            if(!base64Str) return;
-            document.getElementById('pdfStatus').textContent = "Template Loaded";
-            document.getElementById('pdfStatus').className = "text-sm font-medium text-green-600";
-            document.getElementById('saveVisualCalBtn').classList.remove('hidden');
-            const binary = atob(base64Str);
-            const array = new Uint8Array(binary.length);
-            for(let i=0; i<binary.length; i++) array[i] = binary.charCodeAt(i);
+        window.downloadSavedFormWord = async function(formId) {
             try {
-                if(!window.pdfjsLib) return;
-                const doc = await window.pdfjsLib.getDocument(array).promise;
-                const page = await doc.getPage(1);
-                const canvas = document.getElementById('pdfCanvas');
-                const ctx = canvas.getContext('2d');
-                const containerW = document.getElementById('pdfWorkspace').offsetWidth;
-                const viewportRaw = page.getViewport({scale: 1.0});
-                calPdfWidth = viewportRaw.width;
-                calPdfHeight = viewportRaw.height;
-                const scale = containerW / viewportRaw.width;
-                const viewport = page.getViewport({scale: scale});
-                canvas.width = viewport.width;
-                canvas.height = viewport.height;
-                calCanvasScale = scale;
-                await page.render({canvasContext: ctx, viewport: viewport}).promise;
-                document.getElementById('pdfWorkspace').classList.remove('hidden');
-                createMarkers();
-                setTimeout(applyConfigToMarkers, 100);
-            } catch(e) { console.error("PDF Render Error", e); }
-        }
+                const snap = await getDoc(doc(db, 'monthly_forms', formId));
+                if (!snap.exists()) return showToast("Form not found.", true);
+                const data = snap.data();
+                let blob = null;
+                if (data.formDocxBase64) {
+                    blob = base64ToBlob(data.formDocxBase64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+                } else {
+                    blob = await buildMonthlyDocx(data.unit, data.month, data.year, allEntries);
+                }
+                downloadBlob(blob, 'CrashCart_' + data.unit.toUpperCase() + '_' + data.month + '_' + data.year + '.docx');
+            } catch (err) {
+                console.error(err);
+                showToast("Could not generate Word file: " + err.message, true);
+            }
+        };
+
+
+        // ========== WORD (DOCX) TEMPLATE ENGINE ==========
+        const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+        const DOCX_LS_KEY = 'crashCartDocxTemplate';
+        const DOCX_LS_META_KEY = 'crashCartDocxTemplateMeta';
+        const DEFAULT_TEMPLATE_URL = './crash-cart-template.docx';
+        const DEFAULT_COLS = { time:1, lock1:2, lock2:3, exp:4, cb1:5, cb2:6, cb3:7, cb4:8, cb5:9, cb6:10, power:11, test:12, o2:13, staff:14 };
+        const CHECKED = '\u2611';   // ballot box with check
+        const UNCHECKED = '\u2610'; // ballot box
 
         function loadSettings() {
             document.getElementById('webhookUrl').value = localStorage.getItem('webhookUrl') || '';
-            if(localStorage.getItem('basePdfBase64')) renderWorkspacePDF();
         }
 
-        function getPDFConfig() {
-            const def = {
-                startY: 615, rowHeight: 14.5,
-                colLock1X: 135, colLock2X: 200, colExpX: 250,
-                colCb1X: 295, colCb2X: 330, colCb3X: 360, colCb4X: 395, colCb5X: 430, colCb6X: 460, colCb7X: 495,
-                colStaffX: 540
-            };
-            try { return JSON.parse(localStorage.getItem('pdfConfig')) || def; } catch(e) { return def; }
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const r = new FileReader();
+                r.onload = () => resolve(String(r.result).split(',')[1]);
+                r.onerror = reject;
+                r.readAsDataURL(blob);
+            });
+        }
+
+        function base64ToBlob(b64, mime) {
+            const bin = atob(b64);
+            const arr = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+            return new Blob([arr], { type: mime || DOCX_MIME });
+        }
+
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename; a.target = '_self';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+        }
+
+        async function getTemplateBytes() {
+            const b64 = localStorage.getItem(DOCX_LS_KEY);
+            if (b64) {
+                const bin = atob(b64);
+                const arr = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+                return arr;
+            }
+            const resp = await fetch(DEFAULT_TEMPLATE_URL);
+            if (!resp.ok) throw new Error('Could not load default template (' + resp.status + ')');
+            return new Uint8Array(await resp.arrayBuffer());
+        }
+
+        function elChildren(node, localName) {
+            return Array.from(node.childNodes).filter(n => n.namespaceURI === W_NS && n.localName === localName);
+        }
+
+        function cellText(tc) {
+            return Array.from(tc.getElementsByTagNameNS(W_NS, 't')).map(t => t.textContent || '').join('');
+        }
+
+        // Find a table that contains consecutive rows whose first cell reads 1..31 (header rows allowed before).
+        function findDayTable(docXml) {
+            const tables = docXml.getElementsByTagNameNS(W_NS, 'tbl');
+            for (const tbl of tables) {
+                const rows = elChildren(tbl, 'tr');
+                let expected = 1, startIdx = -1;
+                for (let i = 0; i < rows.length; i++) {
+                    const cells = elChildren(rows[i], 'tc');
+                    const first = cells.length ? cellText(cells[0]).trim() : '';
+                    if (first === String(expected)) {
+                        if (expected === 1) startIdx = i;
+                        expected++;
+                        if (expected === 32) return { tbl: tbl, rows: rows, startIdx: startIdx };
+                    } else {
+                        expected = (first === '1') ? 2 : 1;
+                        startIdx = (first === '1') ? i : -1;
+                    }
+                }
+            }
+            return null;
+        }
+
+        const COL_KEYWORDS = [
+            ['time',  ['time']],
+            ['lock1', ['lock#1', 'lock #1', 'lock 1', 'pharmacy']],
+            ['lock2', ['lock#2', 'lock #2', 'lock 2']],
+            ['exp',   ['exp']],
+            ['cb1',   ['manual resus']],
+            ['cb2',   ['paper']],
+            ['cb3',   ['electrode']],
+            ['cb4',   ['combo pad', 'quick pad']],
+            ['cb5',   ['weight']],
+            ['cb6',   ['binder']],
+            ['power', ['power cord', 'powercord']],
+            ['test',  ['test result', 'testresult']],
+            ['o2',    ['o2 tank', 'oxygen', 'o2 ']],
+            ['staff', ['name of person', 'checking equipment', 'print name']]
+        ];
+
+        // Best-effort column detection from subheader labels above the day rows; falls back to defaults.
+        // Only consider rows with the same physical cell count as the day rows. This skips merged
+        // title headers (which have fewer <w:tc> elements because of gridSpan) and prevents
+        // shifted detections such as O2/staff being mapped to the merged header positions.
+        function detectColumns(found) {
+            const dayCells = elChildren(found.rows[found.startIdx], 'tc');
+            const detected = {};
+            for (let i = Math.max(0, found.startIdx - 3); i < found.startIdx; i++) {
+                const cells = elChildren(found.rows[i], 'tc');
+                if (cells.length !== dayCells.length) continue;
+                cells.forEach((tc, ci) => {
+                    const t = cellText(tc).toLowerCase();
+                    COL_KEYWORDS.forEach(([key, kws]) => {
+                        if (!(key in detected) && kws.some(k => t.includes(k))) detected[key] = ci;
+                    });
+                });
+            }
+            const colMap = {};
+            Object.keys(DEFAULT_COLS).forEach(k => {
+                let idx = (k in detected) ? detected[k] : DEFAULT_COLS[k];
+                if (idx == null || idx >= dayCells.length) idx = (DEFAULT_COLS[k] < dayCells.length) ? DEFAULT_COLS[k] : null;
+                colMap[k] = idx;
+            });
+            return colMap;
+        }
+
+        // Replace a cell's content with one run of text, preserving tcPr/pPr and first run properties.
+        function setCellText(docXml, tc, text) {
+            let ps = elChildren(tc, 'p');
+            let p = ps[0];
+            if (!p) { p = docXml.createElementNS(W_NS, 'w:p'); tc.appendChild(p); ps = [p]; }
+            let rPr = null;
+            const runs = tc.getElementsByTagNameNS(W_NS, 'r');
+            if (runs.length) {
+                const rp = runs[0].getElementsByTagNameNS(W_NS, 'rPr')[0];
+                if (rp) rPr = rp.cloneNode(true);
+            }
+            Array.from(p.childNodes).forEach(n => {
+                if (!(n.namespaceURI === W_NS && n.localName === 'pPr')) p.removeChild(n);
+            });
+            if (text !== '') {
+                const r = docXml.createElementNS(W_NS, 'w:r');
+                if (rPr) r.appendChild(rPr);
+                const t = docXml.createElementNS(W_NS, 'w:t');
+                t.textContent = text;
+                t.setAttribute('xml:space', 'preserve');
+                r.appendChild(t);
+                p.appendChild(r);
+            }
+            ps.slice(1).forEach(x => tc.removeChild(x));
+        }
+
+        function updateHeaderParagraph(docXml, unit, month, year) {
+            const monthNames = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
+            const monthName = monthNames[parseInt(month, 10)] || month;
+            const ps = docXml.getElementsByTagNameNS(W_NS, 'p');
+            for (const p of ps) {
+                const txt = Array.from(p.getElementsByTagNameNS(W_NS, 't')).map(t => t.textContent || '').join('');
+                if (txt.includes('Unit:') && txt.includes('Month:') && txt.includes('Year:')) {
+                    let rPr = null;
+                    const runs = p.getElementsByTagNameNS(W_NS, 'r');
+                    if (runs.length) {
+                        const rp = runs[0].getElementsByTagNameNS(W_NS, 'rPr')[0];
+                        if (rp) rPr = rp.cloneNode(true);
+                    }
+                    Array.from(p.childNodes).forEach(n => {
+                        if (!(n.namespaceURI === W_NS && n.localName === 'pPr')) p.removeChild(n);
+                    });
+                    const r = docXml.createElementNS(W_NS, 'w:r');
+                    if (rPr) r.appendChild(rPr);
+                    const t = docXml.createElementNS(W_NS, 'w:t');
+                    t.textContent = 'Unit: ' + unit.toUpperCase() + '        Month: ' + monthName + '        Year: ' + year;
+                    t.setAttribute('xml:space', 'preserve');
+                    r.appendChild(t);
+                    p.appendChild(r);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        async function parseTemplate(bytes) {
+            const zip = await JSZip.loadAsync(bytes);
+            const file = zip.file('word/document.xml');
+            if (!file) throw new Error('Not a valid Word document (missing word/document.xml).');
+            const xmlText = await file.async('string');
+            const docXml = new DOMParser().parseFromString(xmlText, 'application/xml');
+            if (docXml.getElementsByTagName('parsererror').length) throw new Error('Template document.xml could not be parsed.');
+            return { zip: zip, docXml: docXml };
+        }
+
+        // Full validation used for user uploads. Throws with a clear message on failure.
+        async function validateTemplateBytes(bytes) {
+            let parsed;
+            try { parsed = await parseTemplate(bytes); }
+            catch (e) { throw new Error('This file is not a valid .docx (must be a zipped Word document with word/document.xml). ' + e.message); }
+            const found = findDayTable(parsed.docXml);
+            if (!found) throw new Error('No crash cart log table found: the template must contain a table with rows whose first cell is numbered 1 through 31.');
+            const colMap = detectColumns(found);
+            ['time','lock1','lock2','exp','staff'].forEach(k => {
+                if (colMap[k] == null) throw new Error('Could not locate the "' + k + '" column in the template table.');
+            });
+            return colMap;
+        }
+
+        async function buildMonthlyDocx(unit, month, year, entries) {
+            const bytes = await getTemplateBytes();
+            const parsed = await parseTemplate(bytes);
+            const found = findDayTable(parsed.docXml);
+            if (!found) throw new Error('No day-row table (days 1-31) found in the current template.');
+            const colMap = detectColumns(found);
+            const entryByDay = {};
+            entries.filter(e => e.unit === unit && e.month === month && e.year === year)
+                   .forEach(e => { entryByDay[e.day] = e; });
+
+            for (let d = 1; d <= 31; d++) {
+                const row = found.rows[found.startIdx + d - 1];
+                const cells = elChildren(row, 'tc');
+                const set = (idx, val) => { if (idx != null && cells[idx]) setCellText(parsed.docXml, cells[idx], val); };
+                // Clear all fillable fields first so regenerated months are accurate, then restore
+                // the official empty checkbox glyphs used by the log for equipment inspection cells.
+                Object.values(colMap).forEach(idx => set(idx, ''));
+                ['cb1','cb2','cb3','cb4','cb5','cb6','power','o2'].forEach(k => set(colMap[k], UNCHECKED));
+                const e = entryByDay[d];
+                if (e) {
+                    const cb = v => v ? CHECKED : UNCHECKED;
+                    set(colMap.time,  e.time || '');
+                    set(colMap.lock1, e.lock1 || '');
+                    set(colMap.lock2, e.lock2 || '');
+                    set(colMap.exp,   e.expDate || '');
+                    set(colMap.cb1, cb(e.cb1));
+                    set(colMap.cb2, cb(e.cb2));
+                    set(colMap.cb3, cb(e.cb3));
+                    set(colMap.cb4, cb(e.cb4));
+                    set(colMap.cb5, cb(e.cb5));
+                    set(colMap.cb6, cb(e.cb6));
+                    set(colMap.power, cb(e.cb7));   // defib power cord
+                    set(colMap.o2,    cb(e.cb7));   // O2 tank
+                    set(colMap.staff, e.staffName || '');
+                }
+            }
+
+            updateHeaderParagraph(parsed.docXml, unit, month, year);
+            const out = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n' + new XMLSerializer().serializeToString(parsed.docXml);
+            parsed.zip.file('word/document.xml', out);
+            return parsed.zip.generateAsync({ type: 'blob', mimeType: DOCX_MIME });
+        }
+
+        async function downloadMonthlyWord() {
+            const m = document.getElementById('filterMonth').value;
+            const y = document.getElementById('filterYear').value;
+            const u = document.getElementById('filterUnit').value;
+            const btn = document.getElementById('downloadWordBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Building...';
+            try {
+                const blob = await buildMonthlyDocx(u, m, y, allEntries);
+                downloadBlob(blob, 'CrashCart_' + u.toUpperCase() + '_' + m + '_' + y + '.docx');
+                showToast("Word form downloaded!");
+            } catch (err) {
+                console.error(err);
+                showToast("Word generation failed: " + err.message, true);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-file-word mr-2"></i> Download Word';
+            }
+        }
+
+        // ========== TEMPLATE MANAGER (Settings) ==========
+        function refreshTemplateStatus() {
+            const statusEl = document.getElementById('docxStatus');
+            const infoEl = document.getElementById('docxTemplateInfo');
+            const resetBtn = document.getElementById('resetTemplateBtn');
+            const metaRaw = localStorage.getItem(DOCX_LS_META_KEY);
+            if (metaRaw) {
+                let meta = {};
+                try { meta = JSON.parse(metaRaw); } catch (e) {}
+                statusEl.textContent = 'Custom Template Active';
+                statusEl.className = 'text-sm font-medium text-green-600';
+                infoEl.innerHTML = '<strong>Source:</strong> Custom upload<br>' +
+                    '<strong>File:</strong> ' + (meta.name || 'unknown') + '<br>' +
+                    '<strong>Uploaded:</strong> ' + (meta.date || 'unknown');
+                resetBtn.classList.remove('hidden');
+            } else {
+                statusEl.textContent = 'Default Template Active';
+                statusEl.className = 'text-sm font-medium text-blue-600';
+                infoEl.innerHTML = '<strong>Source:</strong> Built-in default (<code>crash-cart-template.docx</code>)<br>' +
+                    'Upload a revised crash cart log below to replace it.';
+                resetBtn.classList.add('hidden');
+            }
+        }
+
+        async function handleDocxUpload(e) {
+            const file = e.target.files[0];
+            const errEl = document.getElementById('docxUploadError');
+            errEl.classList.add('hidden');
+            if (!file) return;
+            try {
+                const buf = new Uint8Array(await file.arrayBuffer());
+                await validateTemplateBytes(buf);
+                const b64 = await blobToBase64(file);
+                localStorage.setItem(DOCX_LS_KEY, b64);
+                localStorage.setItem(DOCX_LS_META_KEY, JSON.stringify({ name: file.name, date: new Date().toLocaleString() }));
+                refreshTemplateStatus();
+                showToast("New Word template saved and validated!");
+            } catch (err) {
+                errEl.innerHTML = '<strong>Template rejected:</strong> ' + err.message;
+                errEl.classList.remove('hidden');
+            } finally {
+                e.target.value = '';
+            }
+        }
+
+        function resetDocxTemplate() {
+            localStorage.removeItem(DOCX_LS_KEY);
+            localStorage.removeItem(DOCX_LS_META_KEY);
+            document.getElementById('docxUploadError').classList.add('hidden');
+            refreshTemplateStatus();
+            showToast("Reverted to default template.");
+        }
+
+        async function downloadCurrentTemplate() {
+            try {
+                const bytes = await getTemplateBytes();
+                downloadBlob(new Blob([bytes], { type: DOCX_MIME }), 'crash-cart-template.docx');
+            } catch (err) {
+                showToast("Could not download template: " + err.message, true);
+            }
         }
 
         // ========== WEBHOOKS ==========
