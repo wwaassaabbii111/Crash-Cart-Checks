@@ -5,11 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crash Cart & Defibrillator Daily Check</title>
     
-    <!-- Dependencies -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/pdf-lib@1.17.5/dist/pdf-lib.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    
+    <!-- FontAwesome Icons -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- PDF.js for Visual Calibrator (Loaded synchronously to prevent crashes) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     
     <style>
         .tab-content { display: none; }
@@ -18,27 +21,27 @@
         /* Drag and Drop Calibration Markers */
         .drag-marker {
             position: absolute;
-            width: 28px;
-            height: 28px;
+            width: 32px;
+            height: 32px;
             background-color: rgba(37, 99, 235, 0.9); /* Blue */
             color: white;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 10px;
+            font-size: 11px;
             font-weight: bold;
             cursor: grab;
             transform: translate(-50%, -50%);
             user-select: none;
-            touch-action: none; /* Prevents scrolling while dragging on mobile */
+            touch-action: none;
             z-index: 10;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
             border: 2px solid white;
         }
-        .drag-marker:active { cursor: grabbing; transform: translate(-50%, -50%) scale(1.1); }
-        .drag-marker.row-marker { background-color: rgba(220, 38, 38, 0.9); } /* Red for Row 2 */
-        .drag-marker.cb-marker { width: 22px; height: 22px; font-size: 9px; background-color: rgba(16, 185, 129, 0.9); } /* Green for Checkboxes */
+        .drag-marker:active { cursor: grabbing; transform: translate(-50%, -50%) scale(1.15); }
+        .drag-marker.row-marker { background-color: rgba(220, 38, 38, 0.9); z-index: 11; } 
+        .drag-marker.cb-marker { width: 24px; height: 24px; font-size: 9px; background-color: rgba(16, 185, 129, 0.9); } 
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen font-sans flex flex-col relative">
@@ -102,20 +105,19 @@
             <span id="toast-msg">Success!</span>
         </div>
 
-        <!-- Custom Modal (For alerts & PDF Preview) -->
+        <!-- Delete Confirmation Modal -->
         <div id="customModal" class="fixed inset-0 bg-black bg-opacity-60 hidden flex items-center justify-center z-50 p-4">
-            <div id="modalContainer" class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-auto flex flex-col max-h-full">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-auto flex flex-col">
                 <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
-                    <h3 id="modalTitle" class="text-lg font-bold text-gray-800">Message</h3>
+                    <h3 id="modalTitle" class="text-lg font-bold text-gray-800">Confirm</h3>
                     <button id="modalCloseIcon" class="text-gray-500 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl"></i></button>
                 </div>
-                <div id="modalBody" class="p-4 overflow-y-auto flex-grow">
-                    <p id="modalMessage" class="text-gray-600 mb-2">Details here...</p>
-                    <iframe id="pdfPreviewFrame" class="hidden w-full h-[60vh] border rounded" src=""></iframe>
+                <div class="p-4">
+                    <p id="modalMessage" class="text-gray-600">Are you sure?</p>
                 </div>
                 <div class="p-4 border-t flex justify-end gap-2 bg-gray-50 rounded-b-lg">
-                    <button id="modalCancelBtn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 hidden">Cancel</button>
-                    <button id="modalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">OK</button>
+                    <button id="modalCancelBtn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Cancel</button>
+                    <button id="modalConfirmBtn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
                 </div>
             </div>
         </div>
@@ -211,11 +213,11 @@
                         </select>
                     </div>
                     
-                    <div class="ml-auto flex gap-2 w-full sm:w-auto mt-4 sm:mt-0">
-                        <button id="previewPdfBtn" class="flex-1 sm:flex-none bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
+                    <div class="ml-auto flex gap-2 w-full md:w-auto mt-4 md:mt-0">
+                        <button id="previewPdfBtn" class="flex-1 md:flex-none bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
                             <i class="fa-solid fa-eye mr-2"></i> Preview PDF
                         </button>
-                        <button id="exportPdfBtn" class="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
+                        <button id="exportPdfBtn" class="flex-1 md:flex-none bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
                             <i class="fa-solid fa-file-pdf mr-2"></i> Download PDF
                         </button>
                     </div>
@@ -270,9 +272,9 @@
                 
                 <p class="text-sm text-gray-600 mb-4">
                     <strong>Step 1:</strong> Upload your blank PDF. <br>
-                    <strong>Step 2:</strong> Drag the blue dots to align with the columns on <strong>Day 1 (Row 1)</strong>.<br>
-                    <strong>Step 3:</strong> Drag the red dot down to <strong>Day 2 (Row 2)</strong> to set the row spacing.<br>
-                    <strong>Step 4:</strong> Click Save!
+                    <strong>Step 2:</strong> Drag the blue and green dots to align inside the columns for <strong>Day 1 (Row 1)</strong>.<br>
+                    <strong>Step 3:</strong> Drag the red dot down to the Lock 1 box on <strong>Day 2 (Row 2)</strong> to teach it the row spacing.<br>
+                    <strong>Step 4:</strong> Click Save Positions!
                 </p>
 
                 <div class="mb-4 flex gap-4 items-center">
@@ -281,8 +283,8 @@
                 </div>
 
                 <!-- Canvas Area -->
-                <div id="pdfWorkspace" class="relative hidden border-2 border-dashed border-gray-300 bg-gray-100 overflow-hidden w-full max-w-[800px] mx-auto" style="min-height: 500px;">
-                    <canvas id="pdfCanvas" class="block w-full h-auto"></canvas>
+                <div id="pdfWorkspace" class="relative hidden border-2 border-dashed border-gray-300 bg-gray-100 overflow-hidden w-full mx-auto" style="min-height: 500px; touch-action: none;">
+                    <canvas id="pdfCanvas" class="block w-full h-auto pointer-events-none"></canvas>
                     <div id="markerContainer" class="absolute inset-0">
                         <!-- Markers injected via JS -->
                     </div>
@@ -293,11 +295,13 @@
 
     </main>
 
-    <!-- Firebase Scripts -->
+    <!-- JS MODULE (Handles Firebase and PDF Generation) -->
     <script type="module">
+        // Use secure ESM imports for EVERYTHING to prevent loading crashes
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, doc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { PDFDocument, rgb, StandardFonts } from "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.5/+esm";
 
         // ==============================================================================
         // YOUR FIREBASE CONFIGURATION
@@ -321,11 +325,11 @@
         let allEntries = [];
         let unsubscribeSnapshot = null;
         
-        // PDF.js Configuration
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        // Calibration Variables
         let calCanvasScale = 1;
         let calPdfWidth = 0;
         let calPdfHeight = 0;
+        let deleteIdPending = null;
 
         // --- UI Helpers ---
         function showToast(message, isError = false) {
@@ -334,41 +338,6 @@
             toast.className = `fixed top-4 right-4 px-6 py-3 rounded-md shadow-lg transform transition-all duration-300 z-50 ${isError ? 'bg-red-500' : 'bg-green-500'} text-white`;
             setTimeout(() => { toast.classList.remove('translate-x-full', 'opacity-0'); }, 10);
             setTimeout(() => { toast.classList.add('translate-x-full', 'opacity-0'); }, 3000);
-        }
-
-        function showModal(title, message, isPreview = false, onConfirm = null) {
-            document.getElementById('modalTitle').textContent = title;
-            document.getElementById('modalMessage').textContent = message;
-            const modal = document.getElementById('customModal');
-            const container = document.getElementById('modalContainer');
-            const confirmBtn = document.getElementById('modalConfirmBtn');
-            const cancelBtn = document.getElementById('modalCancelBtn');
-            const iframe = document.getElementById('pdfPreviewFrame');
-            
-            if (isPreview) {
-                container.classList.replace('max-w-sm', 'max-w-4xl');
-                iframe.classList.remove('hidden');
-                document.getElementById('modalMessage').classList.add('hidden');
-            } else {
-                container.classList.replace('max-w-4xl', 'max-w-sm');
-                iframe.classList.add('hidden');
-                iframe.src = '';
-                document.getElementById('modalMessage').classList.remove('hidden');
-            }
-            
-            modal.classList.remove('hidden');
-            
-            const close = () => { modal.classList.add('hidden'); iframe.src=''; };
-            document.getElementById('modalCloseIcon').onclick = close;
-            
-            if (onConfirm) {
-                cancelBtn.classList.remove('hidden');
-                confirmBtn.onclick = () => { close(); onConfirm(); };
-                cancelBtn.onclick = close;
-            } else {
-                cancelBtn.classList.add('hidden');
-                confirmBtn.onclick = close;
-            }
         }
 
         function switchTab(tabId) {
@@ -385,8 +354,22 @@
             }
         }
 
+        function showDeleteModal(id) {
+            deleteIdPending = id;
+            document.getElementById('customModal').classList.remove('hidden');
+        }
+        function hideDeleteModal() {
+            deleteIdPending = null;
+            document.getElementById('customModal').classList.add('hidden');
+        }
+
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
+            // Setup PDF.js safely
+            if (window.pdfjsLib) {
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            }
+
             initDateFields();
             loadSettings();
             
@@ -407,10 +390,24 @@
             
             document.getElementById('saveVisualCalBtn').addEventListener('click', saveVisualCalibration);
             document.getElementById('saveWebhookBtn').addEventListener('click', saveWebhook);
-            document.getElementById('testWebhookBtn').addEventListener('click', testWebhook);
+            document.getElementById('testWebhookBtn').addEventListener('click', () => {
+                alert(checkMissingEntry());
+            });
             document.getElementById('pdfUploader').addEventListener('change', handlePDFUpload);
             document.getElementById('entryForm').addEventListener('submit', handleFormSubmit);
 
+            // Modal listeners
+            document.getElementById('modalCloseIcon').addEventListener('click', hideDeleteModal);
+            document.getElementById('modalCancelBtn').addEventListener('click', hideDeleteModal);
+            document.getElementById('modalConfirmBtn').addEventListener('click', async () => {
+                if(deleteIdPending) {
+                    await deleteDoc(doc(db, 'crashcart_logs', deleteIdPending));
+                    showToast("Entry deleted");
+                    hideDeleteModal();
+                }
+            });
+
+            // Populate Year dropdowns
             const currentYear = new Date().getFullYear();
             const yearSelect = document.getElementById('filterYear');
             for(let i = currentYear - 2; i <= currentYear + 2; i++) {
@@ -535,7 +532,7 @@
                 showToast("Entry saved successfully!");
                 document.getElementById('entryForm').reset();
                 initDateFields(); 
-            } catch (err) { showToast("Error saving.", true); } 
+            } catch (err) { showToast("Error saving. Check rules.", true); } 
             finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save mr-2"></i> Save Entry'; }
         }
 
@@ -571,11 +568,7 @@
 
             document.querySelectorAll('.delete-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
-                    const id = e.currentTarget.getAttribute('data-id');
-                    showModal("Delete Entry", "Are you sure you want to delete this entry?", false, async () => {
-                        await deleteDoc(doc(db, 'crashcart_logs', id));
-                        showToast("Entry deleted");
-                    });
+                    showDeleteModal(e.currentTarget.getAttribute('data-id'));
                 });
             });
         }
@@ -586,12 +579,11 @@
         function initDragAndDrop() {
             const container = document.getElementById('markerContainer');
             
-            // Pointer events handle both Mouse and Touch
             container.addEventListener('pointerdown', (e) => {
                 if (e.target.classList.contains('drag-marker')) {
                     draggedMarker = e.target;
                     e.target.setPointerCapture(e.pointerId);
-                    e.preventDefault(); // Stop scrolling on mobile
+                    e.preventDefault(); 
                 }
             });
 
@@ -601,22 +593,16 @@
                     let x = e.clientX - rect.left;
                     let y = e.clientY - rect.top;
                     
-                    // Constrain within bounds
                     x = Math.max(0, Math.min(x, rect.width));
                     y = Math.max(0, Math.min(y, rect.height));
                     
-                    // If it's a Row 1 marker, lock it to the Row 1 Y axis (mostly) to keep it clean, 
-                    // actually, let's let L1 dictate the master Y, and others just follow its Y visually.
                     if (draggedMarker.id !== 'm_row2') {
                         if (draggedMarker.id === 'm_lock1') {
-                            // Moving the master row 1 pin updates all row 1 pins' Y
                             document.querySelectorAll('.row1-marker').forEach(m => m.style.top = `${y}px`);
                         } else {
-                            // Lock Y to whatever L1 is at
                             y = parseFloat(document.getElementById('m_lock1').style.top);
                         }
                     } else {
-                        // Row 2 marker is locked to L1's X coordinate, only goes up and down
                         x = parseFloat(document.getElementById('m_lock1').style.left);
                     }
                     
@@ -628,7 +614,7 @@
             container.addEventListener('pointerup', (e) => {
                 if(draggedMarker) { draggedMarker.releasePointerCapture(e.pointerId); draggedMarker = null; }
             });
-            container.addEventListener('pointercancel', (e) => { draggedMarker = null; });
+            container.addEventListener('pointercancel', () => { draggedMarker = null; });
         }
 
         function createMarkers() {
@@ -655,7 +641,6 @@
                 el.id = d.id;
                 el.className = `drag-marker ${d.cls}`;
                 el.textContent = d.label;
-                el.title = `Drag to position ${d.label}`;
                 container.appendChild(el);
             });
         }
@@ -664,11 +649,9 @@
             const conf = getPDFConfig();
             if (!calCanvasScale) return;
             
-            // Math: HTML px = (PDF Coord / PDF Width) * Canvas Width
             const canvasW = document.getElementById('pdfCanvas').offsetWidth;
             const scaleX = canvasW / calPdfWidth;
             
-            // PDF Y is from bottom. HTML Y is from top.
             const canvasH = document.getElementById('pdfCanvas').offsetHeight;
             const scaleY = canvasH / calPdfHeight;
             
@@ -694,7 +677,6 @@
             setPos('m_cb6', toHtmlX(conf.colCb6X), r1Y);
             setPos('m_cb7', toHtmlX(conf.colCb7X), r1Y);
             setPos('m_staff', toHtmlX(conf.colStaffX), r1Y);
-            
             setPos('m_row2', toHtmlX(conf.colLock1X), r2Y);
         }
 
@@ -705,7 +687,6 @@
             const scaleY = calPdfHeight / canvasH;
             
             const toPdfX = (elId) => parseFloat(document.getElementById(elId).style.left) * scaleX;
-            // PDF Y = Height - (HTML Y * scale)
             const toPdfY = (elId) => calPdfHeight - (parseFloat(document.getElementById(elId).style.top) * scaleY);
 
             const startY = toPdfY('m_lock1');
@@ -714,9 +695,7 @@
             const conf = {
                 startY: startY,
                 rowHeight: startY - row2Y,
-                colLock1X: toPdfX('m_lock1'),
-                colLock2X: toPdfX('m_lock2'),
-                colExpX: toPdfX('m_exp'),
+                colLock1X: toPdfX('m_lock1'), colLock2X: toPdfX('m_lock2'), colExpX: toPdfX('m_exp'),
                 colCb1X: toPdfX('m_cb1'), colCb2X: toPdfX('m_cb2'), colCb3X: toPdfX('m_cb3'),
                 colCb4X: toPdfX('m_cb4'), colCb5X: toPdfX('m_cb5'), colCb6X: toPdfX('m_cb6'), colCb7X: toPdfX('m_cb7'),
                 colStaffX: toPdfX('m_staff')
@@ -726,7 +705,7 @@
             showToast("Visual Calibration Saved!");
         }
 
-        // --- PDF Generation & Display ---
+        // --- PDF Processing ---
         async function handlePDFUpload(e) {
             const file = e.target.files[0];
             if(!file) return;
@@ -753,13 +732,13 @@
             for(let i=0; i<binary.length; i++) array[i] = binary.charCodeAt(i);
             
             try {
-                const doc = await pdfjsLib.getDocument(array).promise;
+                if(!window.pdfjsLib) return;
+                const doc = await window.pdfjsLib.getDocument(array).promise;
                 const page = await doc.getPage(1);
                 
                 const canvas = document.getElementById('pdfCanvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Determine scale based on container width
                 const containerW = document.getElementById('pdfWorkspace').offsetWidth;
                 const viewportRaw = page.getViewport({scale: 1.0});
                 calPdfWidth = viewportRaw.width;
@@ -776,8 +755,6 @@
                 
                 document.getElementById('pdfWorkspace').classList.remove('hidden');
                 createMarkers();
-                
-                // Wait a tick for CSS layout, then apply
                 setTimeout(applyConfigToMarkers, 100);
             } catch(e) {
                 console.error("PDF Render Error", e);
@@ -803,15 +780,18 @@
 
         async function generatePDF(isDownload) {
             const base64Pdf = localStorage.getItem('basePdfBase64');
-            if(!base64Pdf) return showModal("Missing Template", "Please upload the blank PDF template in the Settings tab first.");
-            if(!window.PDFLib) return showToast("PDF Engine loading...", true);
+            if(!base64Pdf) {
+                alert("Please upload the blank PDF template in the Settings tab first.");
+                return;
+            }
 
-            const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
-            
             const btn = isDownload ? document.getElementById('exportPdfBtn') : document.getElementById('previewPdfBtn');
             const ogText = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Generating...';
+
+            // IMPORTANT Safari Trick: Open the tab synchronously before the async await starts
+            const newTab = isDownload ? null : window.open('', '_blank');
 
             try {
                 const m = document.getElementById('filterMonth').value;
@@ -820,6 +800,8 @@
                 const filtered = allEntries.filter(e => e.month === m && e.year === y && e.unit === u);
 
                 const pdfBytes = Uint8Array.from(atob(base64Pdf), c => c.charCodeAt(0));
+                
+                // Using imported PDFDocument
                 const pdfDoc = await PDFDocument.load(pdfBytes);
                 const page = pdfDoc.getPages()[0]; 
                 const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -863,16 +845,23 @@
                     const link = document.createElement('a');
                     link.href = blobUrl;
                     link.download = `CrashCart_${u}_${m}_${y}.pdf`;
+                    document.body.appendChild(link);
                     link.click();
+                    document.body.removeChild(link);
                     showToast("PDF Downloaded!");
                 } else {
-                    document.getElementById('pdfPreviewFrame').src = blobUrl + '#toolbar=0&navpanes=0&scrollbar=0';
-                    showModal(`Preview: Unit ${u} (${m}/${y})`, "", true);
+                    if (newTab) {
+                        newTab.location.href = blobUrl;
+                    } else {
+                        // Fallback if blocked
+                        window.location.href = blobUrl; 
+                    }
                 }
 
             } catch (err) {
-                console.error(err);
-                showModal("Error", "Error generating PDF. Make sure you uploaded a valid template.");
+                console.error("PDF Gen Error:", err);
+                if (newTab) newTab.close();
+                alert("Error generating PDF. Make sure you uploaded a valid template.");
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = ogText;
@@ -898,8 +887,6 @@
             }
             return `All good. Entry found for ${yStr}.`;
         }
-
-        function testWebhook() { showModal("Test Run", checkMissingEntry()); }
 
         function startBackgroundCheck() {
             setInterval(() => {
