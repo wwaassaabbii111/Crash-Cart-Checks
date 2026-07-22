@@ -4,22 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crash Cart & Defibrillator Daily Check</title>
-    
-    <!-- Tailwind CSS -->
+
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- FontAwesome Icons -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    
-    <!-- PDF.js and PDF-Lib -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://unpkg.com/pdf-lib@1.17.5/dist/pdf-lib.min.js"></script>
-    
+
     <style>
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        
-        /* Drag and Drop Calibration Markers */
+
         .drag-marker {
             position: absolute;
             width: 32px;
@@ -43,7 +36,53 @@
         .drag-marker:active { cursor: grabbing; transform: translate(-50%, -50%) scale(1.15); }
         .drag-marker.row-marker { background-color: rgba(220, 38, 38, 0.9); z-index: 11; } 
         .drag-marker.cb-marker { width: 24px; height: 24px; font-size: 9px; background-color: rgba(16, 185, 129, 0.9); } 
+
+        @media print {
+            body * { visibility: hidden; }
+            #printArea, #printArea * { visibility: visible; }
+            #printArea { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none !important; }
+        }
+
+        .monthly-form {
+            font-family: Arial, sans-serif;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            border: 2px solid #000;
+            padding: 20px;
+            background: white;
+        }
+        .monthly-form h2 { text-align: center; margin-bottom: 10px; font-size: 18px; }
+        .monthly-form .header-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .monthly-form table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        .monthly-form th, .monthly-form td {
+            border: 1px solid #333;
+            padding: 4px 6px;
+            text-align: center;
+        }
+        .monthly-form th {
+            background: #e5e7eb;
+            font-weight: bold;
+            font-size: 10px;
+        }
+        .monthly-form td { height: 28px; }
+        .day-col { width: 30px; }
+        .lock-col { width: 70px; }
+        .exp-col { width: 60px; }
+        .check-col { width: 28px; }
+        .staff-col { width: 100px; }
     </style>
+<base target="_blank">
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen font-sans flex flex-col relative">
 
@@ -55,7 +94,7 @@
                 <h2 class="text-2xl font-bold text-gray-800">Crash Cart Tracker</h2>
                 <p class="text-sm text-gray-500 mt-1">Please sign in to access records.</p>
             </div>
-            
+
             <form id="loginForm" class="space-y-4" onsubmit="event.preventDefault(); return false;">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -72,7 +111,6 @@
                     </div>
                 </div>
                 <div id="loginError" class="text-red-500 text-sm font-medium hidden text-center bg-red-50 p-2 rounded border border-red-200"></div>
-                <!-- Changed to type="button" to prevent form submission reload -->
                 <button type="button" id="loginSubmitBtn" class="w-full bg-blue-700 text-white font-bold py-2.5 px-4 rounded-md hover:bg-blue-800 transition-colors mt-2 shadow-sm">
                     Log In
                 </button>
@@ -91,23 +129,22 @@
                 </button>
             </div>
         </div>
-        <!-- Navigation -->
         <nav class="max-w-5xl mx-auto px-4 flex space-x-1 overflow-x-auto mt-2">
             <button id="tab-btn-log" class="tab-btn px-4 py-2 bg-blue-700 text-white rounded-t-md font-semibold transition-colors border-b-4 border-white">Daily Log</button>
             <button id="tab-btn-review" class="tab-btn px-4 py-2 hover:bg-blue-700 text-blue-100 rounded-t-md font-semibold transition-colors border-b-4 border-transparent">Monthly Review</button>
-            <button id="tab-btn-settings" class="tab-btn px-4 py-2 hover:bg-blue-700 text-blue-100 rounded-t-md font-semibold transition-colors border-b-4 border-transparent">Settings & Alerts</button>
+            <button id="tab-btn-forms" class="tab-btn px-4 py-2 hover:bg-blue-700 text-blue-100 rounded-t-md font-semibold transition-colors border-b-4 border-transparent">Monthly Forms</button>
+            <button id="tab-btn-settings" class="tab-btn px-4 py-2 hover:bg-blue-700 text-blue-100 rounded-t-md font-semibold transition-colors border-b-4 border-transparent">Settings</button>
         </nav>
     </header>
 
-    <!-- Main Content -->
     <main class="flex-grow max-w-5xl mx-auto w-full p-4">
 
-        <!-- Toast Notification -->
+        <!-- Toast -->
         <div id="toast" class="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-md shadow-lg transform transition-all duration-300 translate-x-full opacity-0 z-50">
             <span id="toast-msg">Success!</span>
         </div>
 
-        <!-- UNIFIED MODAL (For both Deleting and Previewing PDFs) -->
+        <!-- Delete Modal -->
         <div id="customModal" class="fixed inset-0 bg-black bg-opacity-60 hidden flex items-center justify-center z-50 p-4">
             <div id="modalContainer" class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-auto flex flex-col max-h-full">
                 <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
@@ -116,7 +153,6 @@
                 </div>
                 <div id="modalBody" class="p-4 overflow-y-auto flex-grow">
                     <p id="modalMessage" class="text-gray-600 mb-2">Details here...</p>
-                    <iframe id="pdfPreviewFrame" class="hidden w-full h-[60vh] border rounded" src=""></iframe>
                 </div>
                 <div class="p-4 border-t flex justify-end gap-2 bg-gray-50 rounded-b-lg">
                     <button id="modalCancelBtn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 hidden">Cancel</button>
@@ -129,7 +165,7 @@
         <div id="log" class="tab-content active">
             <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <h2 class="text-2xl font-bold mb-6 border-b pb-2">New Daily Entry</h2>
-                
+
                 <form id="entryForm" class="space-y-6">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
@@ -190,7 +226,7 @@
         <div id="review" class="tab-content">
             <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
                 <h2 class="text-2xl font-bold mb-4 border-b pb-2">Review & Export Records</h2>
-                
+
                 <div class="flex flex-wrap gap-4 items-end mb-6">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Month</label>
@@ -215,13 +251,13 @@
                             <option value="mobile">mobile</option>
                         </select>
                     </div>
-                    
+
                     <div class="ml-auto flex gap-2 w-full md:w-auto mt-4 md:mt-0">
-                        <button id="previewPdfBtn" class="flex-1 md:flex-none bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
-                            <i class="fa-solid fa-eye mr-2"></i> Preview PDF
+                        <button id="viewMonthlyFormBtn" class="flex-1 md:flex-none bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
+                            <i class="fa-solid fa-file-lines mr-2"></i> View Monthly Form
                         </button>
-                        <button id="exportPdfBtn" class="flex-1 md:flex-none bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
-                            <i class="fa-solid fa-file-pdf mr-2"></i> Download PDF
+                        <button id="printMonthlyFormBtn" class="flex-1 md:flex-none bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
+                            <i class="fa-solid fa-print mr-2"></i> Print/Save PDF
                         </button>
                     </div>
                 </div>
@@ -239,22 +275,32 @@
                                 <th class="px-3 py-3 text-center font-medium text-gray-500 uppercase">Action</th>
                             </tr>
                         </thead>
-                        <tbody id="dataTable" class="bg-white divide-y divide-gray-200">
-                            <!-- Populated via JS -->
-                        </tbody>
+                        <tbody id="dataTable" class="bg-white divide-y divide-gray-200"></tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB: MONTHLY FORMS (Saved PDFs) ==================== -->
+        <div id="forms" class="tab-content">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 class="text-2xl font-bold mb-4 border-b pb-2"><i class="fa-solid fa-folder-open mr-2"></i>Saved Monthly Forms</h2>
+                <p class="text-sm text-gray-600 mb-4">
+                    Forms are auto-saved when the last day of a month is documented. Each unit gets its own form per month.
+                </p>
+
+                <div id="savedFormsList" class="space-y-3">
+                    <div class="text-gray-500 text-center py-8">Loading saved forms...</div>
                 </div>
             </div>
         </div>
 
         <!-- ==================== TAB: SETTINGS ==================== -->
         <div id="settings" class="tab-content">
-            
-            <!-- Webhooks and Automation -->
             <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
                 <h2 class="text-xl font-bold mb-4 border-b pb-2"><i class="fa-solid fa-bell mr-2"></i>Automation & Alerts</h2>
                 <p class="text-sm text-gray-600 mb-4">
-                    The app runs a background check every minute. If it is <strong>08:30 AM</strong>, it verifies if an entry exists for the previous day. If missing, it will trigger the webhook URL below.
+                    The app runs a background check every minute. If it is <strong>08:30 AM</strong>, it verifies if an entry exists for the previous day.
                 </p>
                 <div class="mb-4">
                     <label for="webhookUrl" class="block text-sm font-medium text-gray-700 mb-1">Webhook URL (Make.com, Zapier)</label>
@@ -266,13 +312,12 @@
                 </div>
             </div>
 
-            <!-- Visual PDF Calibration -->
             <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <div class="flex justify-between items-center mb-4 border-b pb-2">
                     <h2 class="text-xl font-bold"><i class="fa-solid fa-ruler-combined mr-2"></i>PDF Drag & Drop Calibrator</h2>
                     <div id="pdfStatus" class="text-sm font-medium text-red-600">No Template Loaded</div>
                 </div>
-                
+
                 <p class="text-sm text-gray-600 mb-4">
                     <strong>Step 1:</strong> Upload your blank PDF. <br>
                     <strong>Step 2:</strong> Drag the blue and green dots to align inside the columns for <strong>Day 1 (Row 1)</strong>.<br>
@@ -285,28 +330,23 @@
                     <button id="saveVisualCalBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded shadow hidden">Save Positions</button>
                 </div>
 
-                <!-- Canvas Area -->
                 <div id="pdfWorkspace" class="relative hidden border-2 border-dashed border-gray-300 bg-gray-100 overflow-hidden w-full mx-auto" style="min-height: 500px; touch-action: none;">
                     <canvas id="pdfCanvas" class="block w-full h-auto pointer-events-none"></canvas>
-                    <div id="markerContainer" class="absolute inset-0">
-                        <!-- Markers injected via JS -->
-                    </div>
+                    <div id="markerContainer" class="absolute inset-0"></div>
                 </div>
-                
             </div>
         </div>
 
     </main>
 
-    <!-- JS MODULE (Handles Firebase) -->
+    <!-- Hidden print area for monthly form -->
+    <div id="printArea" class="hidden"></div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, doc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, doc, deleteDoc, onSnapshot, setDoc, getDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ==============================================================================
-        // YOUR FIREBASE CONFIGURATION
-        // ==============================================================================
         const firebaseConfig = {
           apiKey: "AIzaSyD7XjxWyxOVKsRFCOEbdGa4g-Qin9hFIjA",
           authDomain: "crashcartchecks.firebaseapp.com",
@@ -321,18 +361,15 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // State Management
         let currentUser = null;
         let allEntries = [];
         let unsubscribeSnapshot = null;
-        
-        // Calibration Variables
         let calCanvasScale = 1;
         let calPdfWidth = 0;
         let calPdfHeight = 0;
         let deleteIdPending = null;
 
-        // --- UI Helpers ---
+        // ========== UI HELPERS ==========
         function showToast(message, isError = false) {
             const toast = document.getElementById('toast');
             toast.querySelector('#toast-msg').textContent = message;
@@ -355,22 +392,16 @@
             }
         }
 
-        // --- Unified Modal Handler ---
         function showDeleteModal(id) {
             deleteIdPending = id;
             document.getElementById('modalTitle').textContent = "Confirm Deletion";
             document.getElementById('modalMessage').textContent = "Are you sure you want to delete this entry?";
-            
             document.getElementById('modalMessage').classList.remove('hidden');
-            document.getElementById('pdfPreviewFrame').classList.add('hidden');
-            
             document.getElementById('modalContainer').className = "bg-white rounded-lg shadow-xl w-full max-w-sm mx-auto flex flex-col max-h-full";
             document.getElementById('modalCancelBtn').classList.remove('hidden');
-            
             const confirmBtn = document.getElementById('modalConfirmBtn');
             confirmBtn.textContent = "Delete";
             confirmBtn.className = "px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700";
-            
             confirmBtn.onclick = async () => {
                 if(deleteIdPending) {
                     await deleteDoc(doc(db, 'crashcart_logs', deleteIdPending));
@@ -381,32 +412,12 @@
             document.getElementById('customModal').classList.remove('hidden');
         }
 
-        function showPreviewModal(title, base64Uri) {
-            document.getElementById('modalTitle').textContent = title;
-            document.getElementById('modalMessage').classList.add('hidden');
-            
-            const iframe = document.getElementById('pdfPreviewFrame');
-            iframe.src = base64Uri + '#toolbar=0&navpanes=0&scrollbar=0';
-            iframe.classList.remove('hidden');
-            
-            document.getElementById('modalContainer').className = "bg-white rounded-lg shadow-xl w-full max-w-4xl mx-auto flex flex-col max-h-full";
-            document.getElementById('modalCancelBtn').classList.add('hidden');
-            
-            const confirmBtn = document.getElementById('modalConfirmBtn');
-            confirmBtn.textContent = "Close";
-            confirmBtn.className = "px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700";
-            confirmBtn.onclick = hideModal;
-            
-            document.getElementById('customModal').classList.remove('hidden');
-        }
-
         function hideModal() {
             deleteIdPending = null;
             document.getElementById('customModal').classList.add('hidden');
-            document.getElementById('pdfPreviewFrame').src = '';
         }
 
-        // --- Initialization ---
+        // ========== INIT ==========
         document.addEventListener('DOMContentLoaded', () => {
             if (window.pdfjsLib) {
                 window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -414,31 +425,27 @@
 
             initDateFields();
             loadSettings();
-            
-            // Fix: Changed from form submit listener to button click listener to prevent any reload behavior
+
             document.getElementById('loginSubmitBtn').addEventListener('click', handleLogin);
             document.getElementById('logoutBtn').addEventListener('click', handleLogout);
 
             document.getElementById('tab-btn-log').addEventListener('click', () => switchTab('log'));
             document.getElementById('tab-btn-review').addEventListener('click', () => switchTab('review'));
+            document.getElementById('tab-btn-forms').addEventListener('click', () => { switchTab('forms'); loadSavedForms(); });
             document.getElementById('tab-btn-settings').addEventListener('click', () => switchTab('settings'));
-            
+
             document.getElementById('filterMonth').addEventListener('change', renderTable);
             document.getElementById('filterYear').addEventListener('change', renderTable);
             document.getElementById('filterUnit').addEventListener('change', renderTable);
-            
-            // PDF Generation Binding
-            document.getElementById('exportPdfBtn').addEventListener('click', () => generatePDF(true));
-            document.getElementById('previewPdfBtn').addEventListener('click', () => generatePDF(false));
-            
+
+            document.getElementById('viewMonthlyFormBtn').addEventListener('click', () => generateMonthlyForm(false));
+            document.getElementById('printMonthlyFormBtn').addEventListener('click', () => generateMonthlyForm(true));
+
             document.getElementById('saveVisualCalBtn').addEventListener('click', saveVisualCalibration);
             document.getElementById('saveWebhookBtn').addEventListener('click', saveWebhook);
-            document.getElementById('testWebhookBtn').addEventListener('click', () => {
-                alert(checkMissingEntry());
-            });
+            document.getElementById('testWebhookBtn').addEventListener('click', () => { alert(checkMissingEntry()); });
             document.getElementById('pdfUploader').addEventListener('change', handlePDFUpload);
             document.getElementById('entryForm').addEventListener('submit', handleFormSubmit);
-
             document.getElementById('modalCloseIcon').addEventListener('click', hideModal);
             document.getElementById('modalCancelBtn').addEventListener('click', hideModal);
 
@@ -446,8 +453,7 @@
             const yearSelect = document.getElementById('filterYear');
             for(let i = currentYear - 2; i <= currentYear + 2; i++) {
                 const opt = document.createElement('option');
-                opt.value = i;
-                opt.textContent = i;
+                opt.value = i; opt.textContent = i;
                 if(i === currentYear) opt.selected = true;
                 yearSelect.appendChild(opt);
             }
@@ -457,7 +463,7 @@
             startBackgroundCheck();
         });
 
-        // --- Auth & DB Loading ---
+        // ========== AUTH ==========
         onAuthStateChanged(auth, (user) => {
             const loginOverlay = document.getElementById('loginOverlay');
             const authStatus = document.getElementById('auth-status');
@@ -467,21 +473,17 @@
                 currentUser = user;
                 loginOverlay.classList.add('opacity-0', 'pointer-events-none');
                 setTimeout(() => loginOverlay.classList.add('hidden'), 300);
-                
                 authStatus.innerText = "Logged In";
                 authStatus.classList.replace('text-yellow-300', 'text-green-300');
                 logoutBtn.classList.remove('hidden');
-                
                 loadAllData();
             } else {
                 currentUser = null;
                 loginOverlay.classList.remove('hidden');
                 setTimeout(() => loginOverlay.classList.remove('opacity-0', 'pointer-events-none'), 10);
-                
                 authStatus.innerText = "Logged Out";
                 authStatus.classList.replace('text-green-300', 'text-yellow-300');
                 logoutBtn.classList.add('hidden');
-                
                 allEntries = [];
                 renderTable();
                 if (unsubscribeSnapshot) unsubscribeSnapshot();
@@ -492,28 +494,21 @@
             e.preventDefault();
             const email = document.getElementById('loginEmail').value;
             const pass = document.getElementById('loginPassword').value;
-            
-            // Check if fields are empty manually since we bypassed the default form submission
             if(!email || !pass) return;
-
             const btn = document.getElementById('loginSubmitBtn');
             const err = document.getElementById('loginError');
-
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Signing in...';
             err.classList.add('hidden');
-
             try {
                 await signInWithEmailAndPassword(auth, email, pass);
                 document.getElementById('loginEmail').value = '';
                 document.getElementById('loginPassword').value = '';
             } catch (error) {
-                console.error("Firebase Auth Error:", error);
-                err.innerHTML = `<strong>Error:</strong> ${error.message} <br/><span class="text-[10px] text-gray-500">(${error.code})</span>`;
+                err.innerHTML = '<strong>Error:</strong> ' + error.message + '<br/><span class="text-[10px] text-gray-500">(' + error.code + ')</span>';
                 err.classList.remove('hidden');
             } finally {
-                btn.disabled = false;
-                btn.innerHTML = 'Log In';
+                btn.disabled = false; btn.innerHTML = 'Log In';
             }
         }
 
@@ -529,10 +524,11 @@
                 snapshot.forEach(doc => allEntries.push({ id: doc.id, ...doc.data() }));
                 updateSuggestions(allEntries);
                 renderTable();
+                checkAndAutoSaveMonthlyForm();
             });
         }
 
-        // --- Core Entry Logic ---
+        // ========== ENTRY LOGIC ==========
         function initDateFields() { document.getElementById('entryDate').value = new Date().toISOString().split('T')[0]; }
 
         function updateSuggestions(data) {
@@ -552,7 +548,7 @@
             const btn = document.getElementById('saveBtn');
             btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
             const dateVal = document.getElementById('entryDate').value; 
-            
+
             const entryData = {
                 unit: document.getElementById('unit').value,
                 date: dateVal,
@@ -572,6 +568,7 @@
                 showToast("Entry saved successfully!");
                 document.getElementById('entryForm').reset();
                 initDateFields(); 
+                checkAndAutoSaveMonthlyForm();
             } catch (err) { showToast("Error saving. Check rules.", true); } 
             finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save mr-2"></i> Save Entry'; }
         }
@@ -586,39 +583,303 @@
             const filtered = allEntries.filter(e => e.month === m && e.year === y && e.unit === u).sort((a, b) => a.day - b.day);
 
             if(filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="px-3 py-4 text-center text-gray-500">No entries found for ${m}/${y} in Unit ${u}</td></tr>`;
+                tbody.innerHTML = '<tr><td colspan="7" class="px-3 py-4 text-center text-gray-500">No entries found for ' + m + '/' + y + ' in Unit ' + u + '</td></tr>';
                 return;
             }
 
             filtered.forEach(entry => {
                 const checks = [entry.cb1, entry.cb2, entry.cb3, entry.cb4, entry.cb5, entry.cb6, entry.cb7].filter(Boolean).length;
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="px-3 py-2 whitespace-nowrap">${entry.day}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-xs">${entry.lock1}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-xs">${entry.lock2}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-xs">${entry.expDate}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-center text-sm font-semibold ${checks === 7 ? 'text-green-600' : 'text-red-600'}">${checks}/7</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-xs">${entry.staffName}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-center">
-                        <button class="delete-btn text-red-500 hover:text-red-700 p-1" data-id="${entry.id}"><i class="fa-solid fa-trash"></i></button>
-                    </td>`;
+                tr.innerHTML = '<td class="px-3 py-2 whitespace-nowrap">' + entry.day + '</td>' +
+                    '<td class="px-3 py-2 whitespace-nowrap text-xs">' + (entry.lock1 || '') + '</td>' +
+                    '<td class="px-3 py-2 whitespace-nowrap text-xs">' + (entry.lock2 || '') + '</td>' +
+                    '<td class="px-3 py-2 whitespace-nowrap text-xs">' + (entry.expDate || '') + '</td>' +
+                    '<td class="px-3 py-2 whitespace-nowrap text-center text-sm font-semibold ' + (checks === 7 ? 'text-green-600' : 'text-red-600') + '">' + checks + '/7</td>' +
+                    '<td class="px-3 py-2 whitespace-nowrap text-xs">' + (entry.staffName || '') + '</td>' +
+                    '<td class="px-3 py-2 whitespace-nowrap text-center">' +
+                    '<button class="delete-btn text-red-500 hover:text-red-700 p-1" data-id="' + entry.id + '"><i class="fa-solid fa-trash"></i></button></td>';
                 tbody.appendChild(tr);
             });
 
             document.querySelectorAll('.delete-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    showDeleteModal(e.currentTarget.getAttribute('data-id'));
-                });
+                btn.addEventListener('click', (e) => showDeleteModal(e.currentTarget.getAttribute('data-id')));
             });
         }
 
-        // --- Drag & Drop PDF Calibration ---
+        // ========== MONTHLY FORM GENERATION (NO pdf-lib NEEDED) ==========
+        function generateMonthlyFormHTML(unit, month, year, entries) {
+            const monthNames = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
+            const monthName = monthNames[parseInt(month)];
+            const daysInMonth = new Date(parseInt(year), parseInt(month), 0).getDate();
+
+            const sortedEntries = entries.filter(e => e.unit === unit && e.month === month && e.year === year)
+                                         .sort((a, b) => a.day - b.day);
+
+            const entryByDay = {};
+            sortedEntries.forEach(e => entryByDay[e.day] = e);
+
+            let rows = '';
+            for (let d = 1; d <= daysInMonth; d++) {
+                const e = entryByDay[d];
+                if (e) {
+                    rows += '<tr>' +
+                        '<td class="day-col">' + d + '</td>' +
+                        '<td class="lock-col">' + (e.lock1 || '') + '</td>' +
+                        '<td class="lock-col">' + (e.lock2 || '') + '</td>' +
+                        '<td class="exp-col">' + (e.expDate || '') + '</td>' +
+                        '<td class="check-col">' + (e.cb1 ? 'X' : '') + '</td>' +
+                        '<td class="check-col">' + (e.cb2 ? 'X' : '') + '</td>' +
+                        '<td class="check-col">' + (e.cb3 ? 'X' : '') + '</td>' +
+                        '<td class="check-col">' + (e.cb4 ? 'X' : '') + '</td>' +
+                        '<td class="check-col">' + (e.cb5 ? 'X' : '') + '</td>' +
+                        '<td class="check-col">' + (e.cb6 ? 'X' : '') + '</td>' +
+                        '<td class="check-col">' + (e.cb7 ? 'X' : '') + '</td>' +
+                        '<td class="staff-col">' + (e.staffName || '') + '</td>' +
+                        '</tr>';
+                } else {
+                    rows += '<tr>' +
+                        '<td class="day-col">' + d + '</td>' +
+                        '<td class="lock-col"></td>' +
+                        '<td class="lock-col"></td>' +
+                        '<td class="exp-col"></td>' +
+                        '<td class="check-col"></td>' +
+                        '<td class="check-col"></td>' +
+                        '<td class="check-col"></td>' +
+                        '<td class="check-col"></td>' +
+                        '<td class="check-col"></td>' +
+                        '<td class="check-col"></td>' +
+                        '<td class="check-col"></td>' +
+                        '<td class="staff-col"></td>' +
+                        '</tr>';
+                }
+            }
+
+            return '<div class="monthly-form">' +
+                '<h2>CRASH CART & DEFIBRILLATOR DAILY CHECK</h2>' +
+                '<div class="header-row">' +
+                '<div><strong>Unit:</strong> ' + unit.toUpperCase() + '</div>' +
+                '<div><strong>Month:</strong> ' + monthName + '</div>' +
+                '<div><strong>Year:</strong> ' + year + '</div>' +
+                '</div>' +
+                '<table>' +
+                '<thead>' +
+                '<tr>' +
+                '<th class="day-col">Day</th>' +
+                '<th class="lock-col">Lock #1</th>' +
+                '<th class="lock-col">Lock #2</th>' +
+                '<th class="exp-col">Exp Date</th>' +
+                '<th class="check-col">C1</th>' +
+                '<th class="check-col">C2</th>' +
+                '<th class="check-col">C3</th>' +
+                '<th class="check-col">C4</th>' +
+                '<th class="check-col">C5</th>' +
+                '<th class="check-col">C6</th>' +
+                '<th class="check-col">C7</th>' +
+                '<th class="staff-col">Staff</th>' +
+                '</tr>' +
+                '</thead>' +
+                '<tbody>' + rows + '</tbody>' +
+                '</table>' +
+                '<div style="margin-top: 15px; font-size: 10px; color: #666;">' +
+                '<strong>C1</strong>=Manual Resus Bag | <strong>C2</strong>=2 Pack Paper | <strong>C3</strong>=Electrodes | ' +
+                '<strong>C4</strong>=EKG Pads | <strong>C5</strong>=Weight Tape | <strong>C6</strong>=Code Binder | <strong>C7</strong>=Defib/O2' +
+                '</div>' +
+                '</div>';
+        }
+
+        function generateMonthlyForm(shouldPrint) {
+            const m = document.getElementById('filterMonth').value;
+            const y = document.getElementById('filterYear').value;
+            const u = document.getElementById('filterUnit').value;
+
+            const html = generateMonthlyFormHTML(u, m, y, allEntries);
+            document.getElementById('printArea').innerHTML = html;
+            document.getElementById('printArea').classList.remove('hidden');
+
+            if (shouldPrint) {
+                setTimeout(() => {
+                    window.print();
+                    document.getElementById('printArea').classList.add('hidden');
+                }, 200);
+            } else {
+                const previewWindow = window.open('', '_blank', 'width=900,height=1100');
+                previewWindow.document.write('<!DOCTYPE html><html><head><title>Monthly Form - Unit ' + u + ' ' + m + '/' + y + '</title>' +
+                    '<style>' +
+                    'body { font-family: Arial, sans-serif; padding: 20px; background: #f3f4f6; }' +
+                    '.monthly-form { background: white; padding: 20px; max-width: 800px; margin: 0 auto; border: 2px solid #000; }' +
+                    '.monthly-form h2 { text-align: center; margin-bottom: 10px; font-size: 18px; }' +
+                    '.monthly-form .header-row { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 14px; }' +
+                    '.monthly-form table { width: 100%; border-collapse: collapse; font-size: 11px; }' +
+                    '.monthly-form th, .monthly-form td { border: 1px solid #333; padding: 4px 6px; text-align: center; }' +
+                    '.monthly-form th { background: #e5e7eb; font-weight: bold; font-size: 10px; }' +
+                    '.monthly-form td { height: 28px; }' +
+                    '.day-col { width: 30px; }' +
+                    '.lock-col { width: 70px; }' +
+                    '.exp-col { width: 60px; }' +
+                    '.check-col { width: 28px; }' +
+                    '.staff-col { width: 100px; }' +
+                    '.print-btn { display: block; margin: 20px auto; padding: 10px 30px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }' +
+                    '.print-btn:hover { background: #1d4ed8; }' +
+                    '@media print { .print-btn { display: none; } body { background: white; padding: 0; } }' +
+                    '</style></head><body>' + html + '<button class="print-btn" onclick="window.print()">Print / Save as PDF</button></body></html>');
+                previewWindow.document.close();
+                document.getElementById('printArea').classList.add('hidden');
+            }
+        }
+
+        // ========== AUTO-SAVE MONTHLY FORM LOGIC ==========
+        async function checkAndAutoSaveMonthlyForm() {
+            if (!currentUser || allEntries.length === 0) return;
+
+            const groups = {};
+            allEntries.forEach(e => {
+                const key = e.unit + '_' + e.month + '_' + e.year;
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(e);
+            });
+
+            const today = new Date();
+            const currentMonth = String(today.getMonth() + 1).padStart(2, '0');
+            const currentYear = String(today.getFullYear());
+            const currentDay = today.getDate();
+            const lastDayOfMonth = new Date(parseInt(currentYear), parseInt(currentMonth), 0).getDate();
+
+            for (const key in groups) {
+                const parts = key.split('_');
+                const unit = parts[0];
+                const month = parts[1];
+                const year = parts[2];
+                const entries = groups[key];
+
+                const isMonthComplete = (month === currentMonth && year === currentYear && currentDay >= lastDayOfMonth) ||
+                                        (parseInt(year) < parseInt(currentYear)) ||
+                                        (year === currentYear && parseInt(month) < parseInt(currentMonth));
+
+                if (!isMonthComplete) continue;
+
+                const formId = 'form_' + unit + '_' + month + '_' + year;
+                const formRef = doc(db, 'monthly_forms', formId);
+
+                try {
+                    const snap = await getDoc(formRef);
+                    if (!snap.exists()) {
+                        const formHTML = generateMonthlyFormHTML(unit, month, year, allEntries);
+                        const formData = {
+                            unit: unit,
+                            month: month,
+                            year: year,
+                            formHTML: formHTML,
+                            entryCount: entries.length,
+                            savedAt: Date.now(),
+                            savedBy: currentUser.email,
+                            daysDocumented: entries.map(e => e.day).sort((a,b) => a-b)
+                        };
+                        await setDoc(formRef, formData);
+                        showToast('Auto-saved monthly form: Unit ' + unit.toUpperCase() + ' ' + month + '/' + year);
+                    }
+                } catch (err) {
+                    console.error("Auto-save form error:", err);
+                }
+            }
+        }
+
+        // ========== LOAD SAVED FORMS ==========
+        async function loadSavedForms() {
+            const container = document.getElementById('savedFormsList');
+            container.innerHTML = '<div class="text-gray-500 text-center py-4"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading...</div>';
+
+            try {
+                const formsRef = collection(db, 'monthly_forms');
+                const q = query(formsRef, orderBy("savedAt", "desc"));
+                const querySnapshot = await getDocs(q);
+
+                const forms = [];
+                querySnapshot.forEach(docSnap => {
+                    if (docSnap.id.startsWith('form_')) {
+                        forms.push({ id: docSnap.id, ...docSnap.data() });
+                    }
+                });
+
+                if (forms.length === 0) {
+                    container.innerHTML = '<div class="text-gray-500 text-center py-8">No saved monthly forms yet. Forms auto-save when a month is complete.</div>';
+                    return;
+                }
+
+                const grouped = {};
+                forms.forEach(f => {
+                    const y = f.year;
+                    const m = f.month;
+                    const u = f.unit;
+                    if (!grouped[y]) grouped[y] = {};
+                    if (!grouped[y][m]) grouped[y][m] = {};
+                    grouped[y][m][u] = f;
+                });
+
+                let html = '';
+                const monthNames = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
+
+                Object.keys(grouped).sort((a,b) => b - a).forEach(year => {
+                    html += '<div class="mb-4"><h3 class="text-lg font-bold text-gray-800 mb-2">' + year + '</h3>';
+                    Object.keys(grouped[year]).sort((a,b) => b - a).forEach(month => {
+                        html += '<div class="ml-4 mb-3"><h4 class="text-md font-semibold text-gray-700 mb-1">' + monthNames[parseInt(month)] + '</h4><div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">';
+                        Object.keys(grouped[year][month]).sort().forEach(unit => {
+                            const f = grouped[year][month][unit];
+                            const dateStr = new Date(f.savedAt).toLocaleDateString();
+                            html += '<div class="bg-gray-50 border rounded p-3 hover:bg-blue-50 transition cursor-pointer" onclick="window.openSavedForm(\'' + f.id + '\')">' +
+                                '<div class="font-bold text-blue-800">Unit ' + unit.toUpperCase() + '</div>' +
+                                '<div class="text-xs text-gray-500">' + f.entryCount + ' entries</div>' +
+                                '<div class="text-xs text-gray-400">Saved ' + dateStr + '</div>' +
+                                '</div>';
+                        });
+                        html += '</div></div>';
+                    });
+                    html += '</div>';
+                });
+
+                container.innerHTML = html;
+            } catch (err) {
+                console.error("Load forms error:", err);
+                container.innerHTML = '<div class="text-red-500 text-center py-4">Error loading forms. Please try again.</div>';
+            }
+        }
+
+        window.openSavedForm = async function(formId) {
+            try {
+                const snap = await getDoc(doc(db, 'monthly_forms', formId));
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const previewWindow = window.open('', '_blank', 'width=900,height=1100');
+                    previewWindow.document.write('<!DOCTYPE html><html><head><title>Saved Form - Unit ' + data.unit.toUpperCase() + ' ' + data.month + '/' + data.year + '</title>' +
+                        '<style>' +
+                        'body { font-family: Arial, sans-serif; padding: 20px; background: #f3f4f6; }' +
+                        '.monthly-form { background: white; padding: 20px; max-width: 800px; margin: 0 auto; border: 2px solid #000; }' +
+                        '.monthly-form h2 { text-align: center; margin-bottom: 10px; font-size: 18px; }' +
+                        '.monthly-form .header-row { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 14px; }' +
+                        '.monthly-form table { width: 100%; border-collapse: collapse; font-size: 11px; }' +
+                        '.monthly-form th, .monthly-form td { border: 1px solid #333; padding: 4px 6px; text-align: center; }' +
+                        '.monthly-form th { background: #e5e7eb; font-weight: bold; font-size: 10px; }' +
+                        '.monthly-form td { height: 28px; }' +
+                        '.day-col { width: 30px; }' +
+                        '.lock-col { width: 70px; }' +
+                        '.exp-col { width: 60px; }' +
+                        '.check-col { width: 28px; }' +
+                        '.staff-col { width: 100px; }' +
+                        '.print-btn { display: block; margin: 20px auto; padding: 10px 30px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }' +
+                        '.print-btn:hover { background: #1d4ed8; }' +
+                        '@media print { .print-btn { display: none; } body { background: white; padding: 0; } }' +
+                        '</style></head><body>' + data.formHTML + '<button class="print-btn" onclick="window.print()">Print / Save as PDF</button></body></html>');
+                    previewWindow.document.close();
+                }
+            } catch (err) {
+                alert("Error opening form: " + err.message);
+            }
+        };
+
+        // ========== DRAG & DROP CALIBRATION ==========
         let draggedMarker = null;
-        
+
         function initDragAndDrop() {
             const container = document.getElementById('markerContainer');
-            
             container.addEventListener('pointerdown', (e) => {
                 if (e.target.classList.contains('drag-marker')) {
                     draggedMarker = e.target;
@@ -626,31 +887,26 @@
                     e.preventDefault(); 
                 }
             });
-
             container.addEventListener('pointermove', (e) => {
                 if (draggedMarker) {
                     const rect = container.getBoundingClientRect();
                     let x = e.clientX - rect.left;
                     let y = e.clientY - rect.top;
-                    
                     x = Math.max(0, Math.min(x, rect.width));
                     y = Math.max(0, Math.min(y, rect.height));
-                    
                     if (draggedMarker.id !== 'm_row2') {
                         if (draggedMarker.id === 'm_lock1') {
-                            document.querySelectorAll('.row1-marker').forEach(m => m.style.top = `${y}px`);
+                            document.querySelectorAll('.row1-marker').forEach(m => m.style.top = y + 'px');
                         } else {
                             y = parseFloat(document.getElementById('m_lock1').style.top);
                         }
                     } else {
                         x = parseFloat(document.getElementById('m_lock1').style.left);
                     }
-                    
-                    draggedMarker.style.left = `${x}px`;
-                    draggedMarker.style.top = `${y}px`;
+                    draggedMarker.style.left = x + 'px';
+                    draggedMarker.style.top = y + 'px';
                 }
             });
-
             container.addEventListener('pointerup', (e) => {
                 if(draggedMarker) { draggedMarker.releasePointerCapture(e.pointerId); draggedMarker = null; }
             });
@@ -660,7 +916,6 @@
         function createMarkers() {
             const container = document.getElementById('markerContainer');
             container.innerHTML = '';
-            
             const defs = [
                 { id: 'm_lock1', label: 'L1', cls: 'row1-marker' },
                 { id: 'm_lock2', label: 'L2', cls: 'row1-marker' },
@@ -675,12 +930,9 @@
                 { id: 'm_staff', label: 'Staff', cls: 'row1-marker' },
                 { id: 'm_row2', label: 'Row2', cls: 'row-marker' },
             ];
-
             defs.forEach(d => {
                 const el = document.createElement('div');
-                el.id = d.id;
-                el.className = `drag-marker ${d.cls}`;
-                el.textContent = d.label;
+                el.id = d.id; el.className = 'drag-marker ' + d.cls; el.textContent = d.label;
                 container.appendChild(el);
             });
         }
@@ -688,24 +940,18 @@
         function applyConfigToMarkers() {
             const conf = getPDFConfig();
             if (!calCanvasScale) return;
-            
             const canvasW = document.getElementById('pdfCanvas').offsetWidth;
             const scaleX = canvasW / calPdfWidth;
-            
             const canvasH = document.getElementById('pdfCanvas').offsetHeight;
             const scaleY = canvasH / calPdfHeight;
-            
             const toHtmlX = (pdfX) => pdfX * scaleX;
             const toHtmlY = (pdfY) => (calPdfHeight - pdfY) * scaleY;
-            
             const r1Y = toHtmlY(conf.startY);
             const r2Y = toHtmlY(conf.startY - conf.rowHeight);
-            
             const setPos = (id, x, y) => {
                 const el = document.getElementById(id);
-                if(el) { el.style.left = `${x}px`; el.style.top = `${y}px`; }
+                if(el) { el.style.left = x + 'px'; el.style.top = y + 'px'; }
             };
-
             setPos('m_lock1', toHtmlX(conf.colLock1X), r1Y);
             setPos('m_lock2', toHtmlX(conf.colLock2X), r1Y);
             setPos('m_exp', toHtmlX(conf.colExpX), r1Y);
@@ -725,27 +971,21 @@
             const canvasH = document.getElementById('pdfCanvas').offsetHeight;
             const scaleX = calPdfWidth / canvasW;
             const scaleY = calPdfHeight / canvasH;
-            
             const toPdfX = (elId) => parseFloat(document.getElementById(elId).style.left) * scaleX;
             const toPdfY = (elId) => calPdfHeight - (parseFloat(document.getElementById(elId).style.top) * scaleY);
-
             const startY = toPdfY('m_lock1');
             const row2Y = toPdfY('m_row2');
-            
             const conf = {
-                startY: startY,
-                rowHeight: startY - row2Y,
+                startY: startY, rowHeight: startY - row2Y,
                 colLock1X: toPdfX('m_lock1'), colLock2X: toPdfX('m_lock2'), colExpX: toPdfX('m_exp'),
                 colCb1X: toPdfX('m_cb1'), colCb2X: toPdfX('m_cb2'), colCb3X: toPdfX('m_cb3'),
                 colCb4X: toPdfX('m_cb4'), colCb5X: toPdfX('m_cb5'), colCb6X: toPdfX('m_cb6'), colCb7X: toPdfX('m_cb7'),
                 colStaffX: toPdfX('m_staff')
             };
-            
             localStorage.setItem('pdfConfig', JSON.stringify(conf));
             showToast("Visual Calibration Saved!");
         }
 
-        // --- PDF Processing ---
         async function handlePDFUpload(e) {
             const file = e.target.files[0];
             if(!file) return;
@@ -762,50 +1002,37 @@
         async function renderWorkspacePDF() {
             const base64Str = localStorage.getItem('basePdfBase64');
             if(!base64Str) return;
-            
-            document.getElementById('pdfStatus').textContent = "Template Loaded ✓";
+            document.getElementById('pdfStatus').textContent = "Template Loaded";
             document.getElementById('pdfStatus').className = "text-sm font-medium text-green-600";
             document.getElementById('saveVisualCalBtn').classList.remove('hidden');
-            
             const binary = atob(base64Str);
             const array = new Uint8Array(binary.length);
             for(let i=0; i<binary.length; i++) array[i] = binary.charCodeAt(i);
-            
             try {
                 if(!window.pdfjsLib) return;
                 const doc = await window.pdfjsLib.getDocument(array).promise;
                 const page = await doc.getPage(1);
-                
                 const canvas = document.getElementById('pdfCanvas');
                 const ctx = canvas.getContext('2d');
-                
                 const containerW = document.getElementById('pdfWorkspace').offsetWidth;
                 const viewportRaw = page.getViewport({scale: 1.0});
                 calPdfWidth = viewportRaw.width;
                 calPdfHeight = viewportRaw.height;
-                
                 const scale = containerW / viewportRaw.width;
                 const viewport = page.getViewport({scale: scale});
-                
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
                 calCanvasScale = scale;
-                
                 await page.render({canvasContext: ctx, viewport: viewport}).promise;
-                
                 document.getElementById('pdfWorkspace').classList.remove('hidden');
                 createMarkers();
                 setTimeout(applyConfigToMarkers, 100);
-            } catch(e) {
-                console.error("PDF Render Error", e);
-            }
+            } catch(e) { console.error("PDF Render Error", e); }
         }
 
         function loadSettings() {
             document.getElementById('webhookUrl').value = localStorage.getItem('webhookUrl') || '';
-            if(localStorage.getItem('basePdfBase64')) {
-                renderWorkspacePDF();
-            }
+            if(localStorage.getItem('basePdfBase64')) renderWorkspacePDF();
         }
 
         function getPDFConfig() {
@@ -818,110 +1045,7 @@
             try { return JSON.parse(localStorage.getItem('pdfConfig')) || def; } catch(e) { return def; }
         }
 
-        // ==========================================
-        // PDF GENERATION (Completely Rewritten Loop)
-        // ==========================================
-        async function generatePDF(isDownload) {
-            const base64Pdf = localStorage.getItem('basePdfBase64');
-            if(!base64Pdf) {
-                alert("Please upload the blank PDF template in the Settings tab first.");
-                return;
-            }
-
-            const btn = isDownload ? document.getElementById('exportPdfBtn') : document.getElementById('previewPdfBtn');
-            const ogText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Generating...';
-
-            try {
-                if(!window.PDFLib) {
-                    throw new Error("PDF processing engine did not load. Please check your internet connection and try again.");
-                }
-
-                // 1. Safe String to Bytes Conversion (Prevents Safari Memory Crashes)
-                const binaryString = atob(base64Pdf);
-                const pdfBytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    pdfBytes[i] = binaryString.charCodeAt(i);
-                }
-
-                // 2. Load PDF Document
-                const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
-                const pdfDoc = await PDFDocument.load(pdfBytes);
-                const page = pdfDoc.getPages()[0]; 
-                
-                // Embed Fonts
-                const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-                const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-                
-                const conf = getPDFConfig();
-                
-                // 3. Draw Global Variables
-                const m = document.getElementById('filterMonth').value;
-                const y = document.getElementById('filterYear').value;
-                const u = document.getElementById('filterUnit').value;
-                const filtered = allEntries.filter(e => e.month === m && e.year === y && e.unit === u);
-
-                page.drawText(u, { x: 120, y: 720, size: 12, font: boldFont, color: rgb(0,0,0) });
-                page.drawText(m, { x: 300, y: 720, size: 12, font: boldFont, color: rgb(0,0,0) });
-                page.drawText(y, { x: 450, y: 720, size: 12, font: boldFont, color: rgb(0,0,0) });
-
-                const checkmark = "X";
-                const textSize = 9;
-
-                // 4. Draw Rows Data
-                for (let day = 1; day <= 31; day++) {
-                    const entry = filtered.find(e => e.day === day);
-                    if (entry) {
-                        const rowY = conf.startY - ((day - 1) * conf.rowHeight);
-                        
-                        if(entry.lock1) page.drawText(entry.lock1, { x: conf.colLock1X, y: rowY, size: textSize, font });
-                        if(entry.lock2) page.drawText(entry.lock2, { x: conf.colLock2X, y: rowY, size: textSize, font });
-                        if(entry.expDate) page.drawText(entry.expDate, { x: conf.colExpX, y: rowY, size: textSize, font });
-                        
-                        if(entry.cb1) page.drawText(checkmark, { x: conf.colCb1X, y: rowY, size: textSize, font });
-                        if(entry.cb2) page.drawText(checkmark, { x: conf.colCb2X, y: rowY, size: textSize, font });
-                        if(entry.cb3) page.drawText(checkmark, { x: conf.colCb3X, y: rowY, size: textSize, font });
-                        if(entry.cb4) page.drawText(checkmark, { x: conf.colCb4X, y: rowY, size: textSize, font });
-                        if(entry.cb5) page.drawText(checkmark, { x: conf.colCb5X, y: rowY, size: textSize, font });
-                        if(entry.cb6) page.drawText(checkmark, { x: conf.colCb6X, y: rowY, size: textSize, font });
-                        if(entry.cb7) page.drawText(checkmark, { x: conf.colCb7X, y: rowY, size: textSize, font });
-                        
-                        if(entry.staffName) page.drawText(entry.staffName, { x: conf.colStaffX, y: rowY, size: textSize, font });
-                    }
-                }
-
-                // 5. Output Logic (Download vs Preview)
-                if (isDownload) {
-                    const pdfBytesOut = await pdfDoc.save();
-                    const blob = new Blob([pdfBytesOut], { type: 'application/pdf' });
-                    const blobUrl = URL.createObjectURL(blob);
-                    
-                    const link = document.createElement('a');
-                    link.href = blobUrl;
-                    link.download = `CrashCart_${u}_${m}_${y}.pdf`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    
-                    setTimeout(() => URL.revokeObjectURL(blobUrl), 200);
-                    showToast("PDF Downloaded!");
-                } else {
-                    // Safe iframe preview using DataURI for iPad
-                    const dataUri = await pdfDoc.saveAsBase64({ dataUri: true });
-                    showPreviewModal(`Preview: Unit ${u} (${m}/${y})`, dataUri);
-                }
-
-            } catch (err) {
-                console.error("PDF Gen Error:", err);
-                alert("Error generating PDF: " + err.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = ogText;
-            }
-        }
-
-        // --- Webhooks ---
+        // ========== WEBHOOKS ==========
         function saveWebhook() {
             localStorage.setItem('webhookUrl', document.getElementById('webhookUrl').value);
             showToast("Webhook URL Saved!");
@@ -930,15 +1054,14 @@
         function checkMissingEntry() {
             const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
             const yStr = yesterday.toISOString().split('T')[0]; 
-
             if(!allEntries.some(e => e.date === yStr)) {
                 const url = localStorage.getItem('webhookUrl');
                 if(url) {
                     fetch(url, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ event: "missing_crashcart_entry", date: yStr }) });
                 }
-                return `Missing entry for ${yStr}. Webhook triggered.`;
+                return 'Missing entry for ' + yStr + '. Webhook triggered.';
             }
-            return `All good. Entry found for ${yStr}.`;
+            return 'All good. Entry found for ' + yStr + '.';
         }
 
         function startBackgroundCheck() {
@@ -956,5 +1079,3 @@
     </script>
 </body>
 </html>
-
-
