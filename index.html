@@ -1131,7 +1131,10 @@
             }
 
             updateHeaderParagraph(parsed.docXml, unit, month, year);
-            const out = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n' + new XMLSerializer().serializeToString(parsed.docXml);
+            // Some browsers include an XML declaration when serializing a Document. Strip it and
+            // add exactly one back; duplicate declarations make Word/iOS reject the DOCX as XML.
+            const serializedXml = new XMLSerializer().serializeToString(parsed.docXml).replace(/^<\?xml[^>]*\?>\s*/i, '');
+            const out = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n' + serializedXml;
             parsed.zip.file('word/document.xml', out);
             return parsed.zip.generateAsync({ type: 'blob', mimeType: DOCX_MIME });
         }
