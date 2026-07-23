@@ -6,8 +6,34 @@
     <title>Crash Cart & Defibrillator Daily Check</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50:'#f0fdfa',100:'#ccfbf1',200:'#99f6e4',300:'#5eead4',
+              400:'#2dd4bf',500:'#14b8a6',600:'#0d9488',700:'#0f766e',
+              800:'#115e59',900:'#134e4a',950:'#042f2e'
+            },
+            surface: '#fafaf9',
+            ink:     '#1c1917',
+            muted:   '#57534e',
+            faint:   '#a8a29e',
+            line:    '#e7e5e4',
+          },
+          fontFamily: { sans: ['Inter','system-ui','sans-serif'] }
+        }
+      }
+    }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
     <style>
         .tab-content { display: none; }
@@ -52,42 +78,72 @@
             font-size: 10px;
         }
         .monthly-form td { height: 28px; }
+        /* App chrome (not the printed document) */
+        .tnum { font-feature-settings: "tnum"; }
+        .field { width: 100%; height: 2.75rem; padding: 0 0.75rem; font-size: 1rem; border-radius: 0.5rem; border: 1px solid #e7e5e4; background: #fff; color: #1c1917; }
+        .field:focus, button:focus-visible, .tab-btn:focus-visible, a:focus-visible, input[type="checkbox"]:focus-visible {
+            outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0d9488;
+        }
+        .section-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #57534e; }
+        .chip { display: inline-flex; align-items: center; height: 2rem; padding: 0 0.75rem; font-size: 0.8125rem; font-weight: 600; border-radius: 9999px; border: 1px solid #e7e5e4; background: #fff; color: #1c1917; cursor: pointer; }
+        .chip:hover { background: #f5f5f4; }
+        .badge { display: inline-flex; align-items: center; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; padding: 0.125rem 0.625rem; border: 1px solid; }
+        .badge-ok { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+        .badge-warn { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+        .badge-err { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+        .btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem; height: 2.75rem; padding: 0 0.75rem; font-size: 0.875rem; font-weight: 600; border-radius: 0.5rem; border: 1px solid #e7e5e4; background: #fff; color: #1c1917; cursor: pointer; white-space: nowrap; }
+        .btn-secondary:hover { background: #f5f5f4; }
+        .btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: 2.75rem; padding: 0 1rem; font-size: 0.9375rem; font-weight: 600; border-radius: 0.5rem; background: #0f766e; color: #fff; cursor: pointer; white-space: nowrap; }
+        .btn-primary:hover { background: #115e59; }
+        .btn-primary:disabled, .btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .check-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; min-height: 2.75rem; border-radius: 0.5rem; border: 1px solid #e7e5e4; background: #fff; cursor: pointer; }
+        .check-row:hover { background: #f5f5f4; }
+        .check-row input { width: 1.25rem; height: 1.25rem; accent-color: #0f766e; flex-shrink: 0; }
+        /* Doc viewer: full-screen sheet on mobile */
+        @media (max-width: 767px) {
+            #docViewerModal { padding: 0 !important; }
+            #docViewerSheet { width: 100% !important; max-width: none !important; height: 100% !important; max-height: none !important; border-radius: 0 !important; }
+            .monthly-form-scroll { overflow-x: auto; }
+            .monthly-form-scroll .monthly-form table { min-width: 720px; }
+        }
         .day-col { width: 30px; }
+        .time-col { width: 45px; }
         .lock-col { width: 70px; }
         .exp-col { width: 60px; }
         .check-col { width: 28px; }
+        .test-col { width: 50px; }
         .staff-col { width: 100px; }
     </style>
 <base target="_blank">
 </head>
-<body class="bg-gray-50 text-gray-800 min-h-screen font-sans flex flex-col relative">
+<body class="bg-surface text-ink min-h-screen font-sans flex flex-col relative">
 
     <!-- LOGIN OVERLAY -->
-    <div id="loginOverlay" class="fixed inset-0 bg-gray-100 z-50 flex items-center justify-center transition-opacity duration-300">
-        <div class="bg-white p-8 rounded-xl shadow-xl w-full max-w-sm border border-gray-200">
+    <div id="loginOverlay" class="fixed inset-0 bg-surface z-50 flex items-center justify-center transition-opacity duration-300 p-4">
+        <div class="bg-white p-8 rounded-xl w-full max-w-sm border border-line" style="box-shadow:0 1px 2px rgba(0,0,0,.04)">
             <div class="text-center mb-6">
-                <i class="fa-solid fa-truck-medical text-4xl text-blue-700 mb-2"></i>
-                <h2 class="text-2xl font-bold text-gray-800">Crash Cart Tracker</h2>
-                <p class="text-sm text-gray-500 mt-1">Please sign in to access records.</p>
+                <i class="fa-solid fa-truck-medical text-4xl text-brand-800 mb-2"></i>
+                <h2 class="text-xl font-semibold text-ink">Crash Cart Tracker</h2>
+                <p class="text-sm text-muted mt-1">Please sign in to access records.</p>
             </div>
 
             <form id="loginForm" class="space-y-4" onsubmit="event.preventDefault(); return false;">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <label for="loginEmail" class="block text-sm font-medium text-ink mb-1.5">Email</label>
                     <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fa-solid fa-envelope text-gray-400"></i></div>
-                        <input type="email" id="loginEmail" required class="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fa-solid fa-envelope text-faint"></i></div>
+                        <input type="email" id="loginEmail" required class="field pl-10">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <label for="loginPassword" class="block text-sm font-medium text-ink mb-1.5">Password</label>
                     <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fa-solid fa-lock text-gray-400"></i></div>
-                        <input type="password" id="loginPassword" required class="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fa-solid fa-lock text-faint"></i></div>
+                        <input type="password" id="loginPassword" required class="field pl-10">
                     </div>
                 </div>
-                <div id="loginError" class="text-red-500 text-sm font-medium hidden text-center bg-red-50 p-2 rounded border border-red-200"></div>
-                <button type="button" id="loginSubmitBtn" class="w-full bg-blue-700 text-white font-bold py-2.5 px-4 rounded-md hover:bg-blue-800 transition-colors mt-2 shadow-sm">
+                <div id="loginError" class="text-sm font-medium hidden text-center bg-red-50 text-red-800 p-2 rounded-lg border border-red-200"></div>
+                <button type="button" id="loginSubmitBtn" class="btn-primary w-full h-12 mt-2">
                     Log In
                 </button>
             </form>
@@ -95,108 +151,135 @@
     </div>
 
     <!-- Header -->
-    <header class="bg-blue-800 text-white shadow-md">
-        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold flex items-center"><i class="fa-solid fa-truck-medical mr-2"></i> Crash Cart Tracker</h1>
-            <div class="flex items-center gap-4">
-                <div id="auth-status" class="text-sm font-medium text-yellow-300">Checking Auth...</div>
-                <button id="logoutBtn" class="hidden bg-blue-900 hover:bg-red-600 text-white py-1.5 px-3 rounded text-sm font-medium transition-colors border border-blue-700 shadow-sm">
-                    <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i> Logout
+    <header class="bg-brand-900 text-white">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
+            <h1 class="text-lg font-semibold flex items-center whitespace-nowrap"><i class="fa-solid fa-truck-medical mr-2"></i> Crash Cart Tracker</h1>
+            <div class="flex items-center gap-3 shrink-0">
+                <div id="auth-status" class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-200 whitespace-nowrap"><span class="w-2 h-2 rounded-full bg-brand-200 inline-block"></span>Checking…</div>
+                <button id="logoutBtn" aria-label="Log out" class="hidden inline-flex items-center justify-center h-11 w-11 md:w-auto md:px-3 rounded-lg text-sm font-medium text-white border border-brand-700 hover:bg-brand-800 transition-colors">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i><span class="hidden md:inline md:ml-2">Logout</span>
                 </button>
             </div>
         </div>
-        <nav class="max-w-5xl mx-auto px-4 flex space-x-1 overflow-x-auto mt-2">
-            <button id="tab-btn-log" class="tab-btn px-4 py-2 bg-blue-700 text-white rounded-t-md font-semibold transition-colors border-b-4 border-white">Daily Log</button>
-            <button id="tab-btn-review" class="tab-btn px-4 py-2 hover:bg-blue-700 text-blue-100 rounded-t-md font-semibold transition-colors border-b-4 border-transparent">Monthly Review</button>
-            <button id="tab-btn-forms" class="tab-btn px-4 py-2 hover:bg-blue-700 text-blue-100 rounded-t-md font-semibold transition-colors border-b-4 border-transparent">Monthly Forms</button>
-            <button id="tab-btn-settings" class="tab-btn px-4 py-2 hover:bg-blue-700 text-blue-100 rounded-t-md font-semibold transition-colors border-b-4 border-transparent">Settings</button>
+        <nav class="max-w-5xl mx-auto px-4 grid grid-cols-5 gap-1 mt-1" role="tablist">
+            <button id="tab-btn-log" class="tab-btn h-11 px-1 sm:px-3 text-sm font-semibold truncate rounded-t-lg bg-white text-brand-900"><span class="sm:hidden">Daily</span><span class="hidden sm:inline">Daily Log</span></button>
+            <button id="tab-btn-review" class="tab-btn h-11 px-1 sm:px-3 text-sm font-semibold truncate rounded-t-lg text-brand-100 hover:text-white"><span class="sm:hidden">Review</span><span class="hidden sm:inline">Monthly Review</span></button>
+            <button id="tab-btn-forms" class="tab-btn h-11 px-1 sm:px-3 text-sm font-semibold truncate rounded-t-lg text-brand-100 hover:text-white"><span class="sm:hidden">Forms</span><span class="hidden sm:inline">Monthly Forms</span></button>
+            <button id="tab-btn-audit" class="tab-btn h-11 px-1 sm:px-3 text-sm font-semibold truncate rounded-t-lg text-brand-100 hover:text-white"><span class="sm:hidden">Audit</span><span class="hidden sm:inline">Audit Dashboard</span></button>
+            <button id="tab-btn-settings" class="tab-btn h-11 px-1 sm:px-3 text-sm font-semibold truncate rounded-t-lg text-brand-100 hover:text-white"><span class="sm:hidden">Settings</span><span class="hidden sm:inline">Settings</span></button>
         </nav>
     </header>
 
-    <main class="flex-grow max-w-5xl mx-auto w-full p-4">
+    <main class="flex-grow max-w-5xl mx-auto w-full px-4 py-4 md:p-6">
 
         <!-- Toast -->
-        <div id="toast" class="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-md shadow-lg transform transition-all duration-300 translate-x-full opacity-0 z-50">
+        <div id="toast" class="fixed top-4 right-4 bg-emerald-700 text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full opacity-0 z-50">
             <span id="toast-msg">Success!</span>
         </div>
 
         <!-- Delete Modal -->
         <div id="customModal" class="fixed inset-0 bg-black bg-opacity-60 hidden flex items-center justify-center z-50 p-4">
-            <div id="modalContainer" class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-auto flex flex-col max-h-full">
-                <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
-                    <h3 id="modalTitle" class="text-lg font-bold text-gray-800">Message</h3>
-                    <button id="modalCloseIcon" class="text-gray-500 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <div id="modalContainer" class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-auto flex flex-col max-h-full border border-line">
+                <div class="p-4 border-b border-line flex justify-between items-center bg-surface rounded-t-xl">
+                    <h3 id="modalTitle" class="text-lg font-semibold text-ink">Message</h3>
+                    <button id="modalCloseIcon" aria-label="Close dialog" class="inline-flex items-center justify-center h-11 w-11 rounded-lg text-muted hover:text-ink hover:bg-stone-100"><i class="fa-solid fa-xmark text-xl"></i></button>
                 </div>
                 <div id="modalBody" class="p-4 overflow-y-auto flex-grow">
-                    <p id="modalMessage" class="text-gray-600 mb-2">Details here...</p>
+                    <p id="modalMessage" class="text-muted mb-2">Details here...</p>
                 </div>
-                <div class="p-4 border-t flex justify-end gap-2 bg-gray-50 rounded-b-lg">
-                    <button id="modalCancelBtn" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 hidden">Cancel</button>
-                    <button id="modalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">OK</button>
+                <div class="p-4 border-t border-line flex justify-end gap-2 bg-surface rounded-b-xl">
+                    <button id="modalCancelBtn" class="btn-secondary hidden">Cancel</button>
+                    <button id="modalConfirmBtn" class="btn-primary">OK</button>
                 </div>
             </div>
         </div>
 
         <!-- ==================== TAB: DAILY LOG ==================== -->
         <div id="log" class="tab-content active">
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h2 class="text-2xl font-bold mb-6 border-b pb-2">New Daily Entry</h2>
+            <div class="bg-white rounded-xl border border-line p-4 pb-24 md:p-6" style="box-shadow:0 1px 2px rgba(0,0,0,.04)">
+                <p class="section-label mb-1">Daily Log</p>
+                <h2 class="text-xl font-semibold mb-5">New Daily Entry</h2>
 
-                <form id="entryForm" class="space-y-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <form id="entryForm" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label for="unit" class="block text-sm font-medium text-gray-700 mb-1">Unit / Location</label>
-                            <select id="unit" required class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 p-2 border bg-white">
+                            <label for="unit" class="block text-sm font-medium text-ink mb-1.5">Unit / Location</label>
+                            <select id="unit" required class="field">
                                 <option value="" disabled selected>Select Location...</option>
-                                <option value="a">a</option><option value="b">b</option>
-                                <option value="c">c</option><option value="d">d</option>
-                                <option value="mobile">mobile</option>
+                                <option value="a">Unit A</option><option value="b">Unit B</option>
+                                <option value="c">Unit C</option><option value="d">Unit D</option>
+                                <option value="mobile">Mobile</option>
                             </select>
                         </div>
                         <div>
-                            <label for="entryDate" class="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                            <input type="date" id="entryDate" required class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                            <label for="entryDate" class="block text-sm font-medium text-ink mb-1.5">Date</label>
+                            <input type="date" id="entryDate" required class="field">
                         </div>
                         <div>
-                            <label for="entryTime" class="block text-sm font-medium text-gray-700 mb-1">Time of Check</label>
-                            <input type="time" id="entryTime" required class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                            <label for="entryTime" class="block text-sm font-medium text-ink mb-1.5">Time of Check</label>
+                            <input type="time" id="entryTime" required class="field">
                         </div>
                         <div>
-                            <label for="lock1" class="block text-sm font-medium text-gray-700 mb-1">Lock #1 (Pharmacy)</label>
-                            <input type="text" id="lock1" list="lock1-suggestions" required placeholder="e.g. 12345*" class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                            <label for="lock1" class="block text-sm font-medium text-ink mb-1.5">Lock #1 (Pharmacy)</label>
+                            <input type="text" id="lock1" list="lock1-suggestions" required placeholder="e.g. 12345*" class="field tnum">
                             <datalist id="lock1-suggestions"></datalist>
                         </div>
                         <div>
-                            <label for="lock2" class="block text-sm font-medium text-gray-700 mb-1">Lock #2</label>
-                            <input type="text" id="lock2" list="lock2-suggestions" required placeholder="e.g. 67891*" class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                            <label for="lock2" class="block text-sm font-medium text-ink mb-1.5">Lock #2</label>
+                            <input type="text" id="lock2" list="lock2-suggestions" required placeholder="e.g. 67891*" class="field tnum">
                             <datalist id="lock2-suggestions"></datalist>
                         </div>
                         <div>
-                            <label for="expDate" class="block text-sm font-medium text-gray-700 mb-1">Earliest Exp. Date</label>
-                            <input type="text" id="expDate" required placeholder="MM/DD/YY" class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                            <label for="expDate" class="block text-sm font-medium text-ink mb-1.5">Earliest Exp. Date</label>
+                            <input type="date" id="expDate" required class="field">
+                            <div class="flex flex-wrap items-center gap-2 mt-2">
+                                <span class="text-xs text-muted mr-1">Quick year:</span>
+                                <button type="button" class="chip" data-exp-years="1">+1y</button>
+                                <button type="button" class="chip" data-exp-years="2">+2y</button>
+                                <button type="button" class="chip" data-exp-years="3">+3y</button>
+                            </div>
+                            <div id="expSuggestionsWrap" class="hidden mt-2">
+                                <p id="expSuggestionsLabel" class="text-xs text-muted mb-1.5"></p>
+                                <div id="expSuggestions" class="flex flex-wrap gap-2"></div>
+                            </div>
                         </div>
                         <div>
-                            <label for="staffName" class="block text-sm font-medium text-gray-700 mb-1">Checking Equipment (Print Name)</label>
-                            <input type="text" id="staffName" list="staff-suggestions" required placeholder="Jane Doe, RN" class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                            <label for="staffName" class="block text-sm font-medium text-ink mb-1.5">Checking Equipment (Print Name)</label>
+                            <input type="text" id="staffName" list="staff-suggestions" required placeholder="Jane Doe, RN" class="field">
                             <datalist id="staff-suggestions"></datalist>
                         </div>
                     </div>
 
-                    <div class="mt-8 border-t pt-6">
-                        <h3 class="text-lg font-semibold mb-4">Equipment Checks (Check all that apply)</h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-md border border-gray-200">
-                            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" id="cb1" class="form-checkbox h-5 w-5 text-blue-600"><span class="text-gray-700">Manual Resus. Bag (Ped/Adult)</span></label>
-                            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" id="cb2" class="form-checkbox h-5 w-5 text-blue-600"><span class="text-gray-700">Extra 2 Pack Paper</span></label>
-                            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" id="cb3" class="form-checkbox h-5 w-5 text-blue-600"><span class="text-gray-700">Roll of Electrodes</span></label>
-                            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" id="cb4" class="form-checkbox h-5 w-5 text-blue-600"><span class="text-gray-700">EKG Quick Combo Pads</span></label>
-                            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" id="cb5" class="form-checkbox h-5 w-5 text-blue-600"><span class="text-gray-700">Weight Estimation Tape (Ped)</span></label>
-                            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" id="cb6" class="form-checkbox h-5 w-5 text-blue-600"><span class="text-gray-700">Code Binder (Ped)</span></label>
-                            <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" id="cb7" class="form-checkbox h-5 w-5 text-blue-600"><span class="text-gray-700">Defib. Power & O2 Tank > 2000 psi</span></label>
+                    <div id="duplicateWarning" class="hidden border border-amber-200 bg-amber-50 text-amber-900 rounded-lg p-3 text-sm flex items-start gap-2">
+                        <i class="fa-solid fa-triangle-exclamation mt-0.5 shrink-0"></i>
+                        <div class="flex-grow" id="duplicateWarningText"></div>
+                        <button type="button" id="duplicateWarningDismiss" aria-label="Dismiss duplicate warning" class="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-lg text-amber-700 hover:bg-amber-100"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+
+                    <div class="border-t border-line pt-4">
+                        <div class="flex items-baseline justify-between mb-3">
+                            <p class="section-label">Equipment Checks</p>
+                            <span id="checksCounter" class="text-sm text-muted tnum">0 of 7 checked</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <label class="check-row"><input type="checkbox" id="cb1"><span class="text-sm text-ink">Manual Resus. Bag (Ped/Adult)</span></label>
+                            <label class="check-row"><input type="checkbox" id="cb2"><span class="text-sm text-ink">Extra 2 Pack Paper</span></label>
+                            <label class="check-row"><input type="checkbox" id="cb3"><span class="text-sm text-ink">Roll of Electrodes</span></label>
+                            <label class="check-row"><input type="checkbox" id="cb4"><span class="text-sm text-ink">EKG Quick Combo Pads</span></label>
+                            <label class="check-row"><input type="checkbox" id="cb5"><span class="text-sm text-ink">Weight Estimation Tape (Ped)</span></label>
+                            <label class="check-row"><input type="checkbox" id="cb6"><span class="text-sm text-ink">Code Binder (Ped)</span></label>
+                            <label class="check-row"><input type="checkbox" id="cb7"><span class="text-sm text-ink">Defib. Power & O2 Tank &gt; 2000 psi</span></label>
                         </div>
                     </div>
 
-                    <div class="flex justify-end pt-4">
-                        <button type="submit" id="saveBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-md shadow transition-colors"><i class="fa-solid fa-save mr-2"></i> Save Entry</button>
+                    <div>
+                        <p class="section-label mb-2">Defib Test Result</p>
+                        <label class="check-row"><input type="checkbox" id="cb8"><span class="text-sm text-ink">Defib Test Result — Pass</span></label>
+                        <p class="text-xs text-muted mt-1.5">Result of the defibrillator test — recorded separately from the 7 equipment checks above.</p>
+                    </div>
+
+                    <div class="sticky bottom-0 -mx-4 -mb-4 md:mx-0 md:mb-0 px-4 py-3 md:p-0 bg-white md:bg-transparent border-t border-line md:border-0 md:static md:flex md:justify-end">
+                        <button type="submit" id="saveBtn" class="btn-primary w-full md:w-auto h-12 md:h-11 md:px-8"><i class="fa-solid fa-save mr-2"></i> Save Entry</button>
                     </div>
                 </form>
             </div>
@@ -204,13 +287,14 @@
 
         <!-- ==================== TAB: MONTHLY REVIEW ==================== -->
         <div id="review" class="tab-content">
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Review & Export Records</h2>
+            <div class="bg-white rounded-xl border border-line p-4 md:p-6 mb-6" style="box-shadow:0 1px 2px rgba(0,0,0,.04)">
+                <p class="section-label mb-1">Monthly Review</p>
+                <h2 class="text-xl font-semibold mb-4">Review & Export Records</h2>
 
-                <div class="flex flex-wrap gap-4 items-end mb-6">
+                <div class="grid grid-cols-3 gap-2 mb-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Month</label>
-                        <select id="filterMonth" class="rounded-md border-gray-300 shadow-sm p-2 border bg-white">
+                        <label for="filterMonth" class="block text-sm font-medium text-ink mb-1.5">Month</label>
+                        <select id="filterMonth" class="field">
                             <option value="01">January</option> <option value="02">February</option>
                             <option value="03">March</option> <option value="04">April</option>
                             <option value="05">May</option> <option value="06">June</option>
@@ -220,45 +304,56 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Year</label>
-                        <select id="filterYear" class="rounded-md border-gray-300 shadow-sm p-2 border bg-white"></select>
+                        <label for="filterYear" class="block text-sm font-medium text-ink mb-1.5">Year</label>
+                        <select id="filterYear" class="field tnum"></select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                        <select id="filterUnit" class="rounded-md border-gray-300 shadow-sm p-2 border bg-white">
-                            <option value="a">a</option><option value="b">b</option>
-                            <option value="c">c</option><option value="d">d</option>
-                            <option value="mobile">mobile</option>
+                        <label for="filterUnit" class="block text-sm font-medium text-ink mb-1.5">Unit</label>
+                        <select id="filterUnit" class="field">
+                            <option value="a">Unit A</option><option value="b">Unit B</option>
+                            <option value="c">Unit C</option><option value="d">Unit D</option>
+                            <option value="mobile">Mobile</option>
                         </select>
                     </div>
+                </div>
 
-                    <div class="ml-auto flex gap-2 w-full md:w-auto mt-4 md:mt-0">
-                        <button id="viewMonthlyFormBtn" class="flex-1 md:flex-none bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
-                            <i class="fa-solid fa-file-lines mr-2"></i> View Monthly Form
+                <div id="reviewSummary" class="mb-4 text-sm text-muted"></div>
+
+                <div class="space-y-2 mb-5">
+                    <button id="viewMonthlyFormBtn" class="btn-primary w-full">
+                        <i class="fa-solid fa-file-lines mr-2"></i> View Monthly Form
+                    </button>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button id="downloadWordBtn" class="btn-secondary">
+                            <i class="fa-solid fa-file-word"></i> Word
                         </button>
-                        <button id="downloadWordBtn" class="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
-                            <i class="fa-solid fa-file-word mr-2"></i> Download Word
+                        <button id="downloadPdfBtn" class="btn-secondary">
+                            <i class="fa-solid fa-file-pdf"></i> PDF
                         </button>
-                        <button id="printMonthlyFormBtn" class="flex-1 md:flex-none bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded shadow-sm transition-colors flex items-center justify-center">
-                            <i class="fa-solid fa-print mr-2"></i> Print/Save PDF
+                        <button id="printMonthlyFormBtn" class="btn-secondary">
+                            <i class="fa-solid fa-print"></i> Print
                         </button>
                     </div>
                 </div>
 
-                <div class="overflow-x-auto border rounded-md">
-                    <table class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead class="bg-gray-50">
+                <!-- Mobile entry cards -->
+                <div id="entryCards" class="md:hidden space-y-2"></div>
+
+                <!-- Desktop table -->
+                <div class="hidden md:block overflow-x-auto border border-line rounded-lg">
+                    <table class="min-w-full divide-y divide-line text-sm tnum">
+                        <thead class="bg-surface">
                             <tr>
-                                <th class="px-3 py-3 text-left font-medium text-gray-500 uppercase">Day</th>
-                                <th class="px-3 py-3 text-left font-medium text-gray-500 uppercase">Lock #1</th>
-                                <th class="px-3 py-3 text-left font-medium text-gray-500 uppercase">Lock #2</th>
-                                <th class="px-3 py-3 text-left font-medium text-gray-500 uppercase">Exp Date</th>
-                                <th class="px-3 py-3 text-center font-medium text-gray-500 uppercase">Checks</th>
-                                <th class="px-3 py-3 text-left font-medium text-gray-500 uppercase">Staff</th>
-                                <th class="px-3 py-3 text-center font-medium text-gray-500 uppercase">Action</th>
+                                <th class="px-3 py-3 text-left font-medium text-muted uppercase text-xs tracking-wider">Day</th>
+                                <th class="px-3 py-3 text-left font-medium text-muted uppercase text-xs tracking-wider">Lock #1</th>
+                                <th class="px-3 py-3 text-left font-medium text-muted uppercase text-xs tracking-wider">Lock #2</th>
+                                <th class="px-3 py-3 text-left font-medium text-muted uppercase text-xs tracking-wider">Exp Date</th>
+                                <th class="px-3 py-3 text-center font-medium text-muted uppercase text-xs tracking-wider">Checks</th>
+                                <th class="px-3 py-3 text-left font-medium text-muted uppercase text-xs tracking-wider">Staff</th>
+                                <th class="px-3 py-3 text-center font-medium text-muted uppercase text-xs tracking-wider">Action</th>
                             </tr>
                         </thead>
-                        <tbody id="dataTable" class="bg-white divide-y divide-gray-200"></tbody>
+                        <tbody id="dataTable" class="bg-white divide-y divide-line"></tbody>
                     </table>
                 </div>
             </div>
@@ -266,60 +361,226 @@
 
         <!-- ==================== TAB: MONTHLY FORMS (Saved PDFs) ==================== -->
         <div id="forms" class="tab-content">
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h2 class="text-2xl font-bold mb-4 border-b pb-2"><i class="fa-solid fa-folder-open mr-2"></i>Saved Monthly Forms</h2>
-                <p class="text-sm text-gray-600 mb-4">
-                    Forms are auto-saved when the last day of a month is documented. Each unit gets its own form per month.
+            <div class="bg-white rounded-xl border border-line p-4 md:p-6" style="box-shadow:0 1px 2px rgba(0,0,0,.04)">
+                <p class="section-label mb-1">Records</p>
+                <h2 class="text-xl font-semibold mb-3"><i class="fa-solid fa-folder-open mr-2"></i>Saved Monthly Forms</h2>
+                <p class="text-sm text-muted mb-4">
+                    A running monthly form is kept for each unit/month as entries are added. A form is marked
+                    <strong>Complete</strong> when the last day of the month is documented; otherwise it shows as <strong>Running</strong>.
                 </p>
 
                 <div id="savedFormsList" class="space-y-3">
-                    <div class="text-gray-500 text-center py-8">Loading saved forms...</div>
+                    <div class="text-muted text-center py-8">Loading saved forms...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB: AUDIT DASHBOARD ==================== -->
+        <div id="audit" class="tab-content">
+            <div class="bg-white rounded-xl border border-line p-4 md:p-6 mb-6" style="box-shadow:0 1px 2px rgba(0,0,0,.04)">
+                <p class="section-label mb-1">Audit the Audit</p>
+                <h2 class="text-xl font-semibold mb-4"><i class="fa-solid fa-clipboard-check mr-2"></i>Audit Dashboard</h2>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-5">
+                    <div>
+                        <label for="auditYear" class="block text-sm font-medium text-ink mb-1.5">Year</label>
+                        <select id="auditYear" class="field tnum"></select>
+                    </div>
+                    <div>
+                        <label for="auditMonth" class="block text-sm font-medium text-ink mb-1.5">Month</label>
+                        <select id="auditMonth" class="field">
+                            <option value="all">All</option>
+                            <option value="01">January</option> <option value="02">February</option>
+                            <option value="03">March</option> <option value="04">April</option>
+                            <option value="05">May</option> <option value="06">June</option>
+                            <option value="07">July</option> <option value="08">August</option>
+                            <option value="09">September</option> <option value="10">October</option>
+                            <option value="11">November</option> <option value="12">December</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="auditUnit" class="block text-sm font-medium text-ink mb-1.5">Unit</label>
+                        <select id="auditUnit" class="field">
+                            <option value="all">All Units</option>
+                            <option value="a">Unit A</option><option value="b">Unit B</option>
+                            <option value="c">Unit C</option><option value="d">Unit D</option>
+                            <option value="mobile">Mobile</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <label class="check-row w-full !min-h-11"><input type="checkbox" id="auditOnlyExceptions"><span class="text-sm text-ink">Only exceptions</span></label>
+                    </div>
+                </div>
+
+                <!-- KPI cards -->
+                <div id="auditKpis" class="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-6"></div>
+
+                <!-- Per-unit compliance matrix -->
+                <div class="mb-6">
+                    <h3 class="text-base font-semibold text-ink mb-2">Per-Unit Compliance</h3>
+                    <div class="hidden md:block overflow-x-auto border border-line rounded-lg">
+                        <table class="min-w-full divide-y divide-line text-sm tnum" id="auditMatrixTable"></table>
+                    </div>
+                    <div id="auditMatrixCards" class="md:hidden space-y-2"></div>
+                </div>
+
+                <!-- Heat strip -->
+                <div class="mb-6">
+                    <h3 class="text-base font-semibold text-ink mb-1" id="auditHeatTitle">Daily Heat Strip</h3>
+                    <p class="text-xs text-muted mb-2">Teal = compliant day · Amber = documented but incomplete · Red outline = missing day</p>
+                    <div id="auditHeatStrip" class="grid gap-1" style="grid-template-columns:repeat(auto-fill,minmax(30px,1fr));"></div>
+                </div>
+
+                <!-- Trend -->
+                <div class="mb-6">
+                    <h3 class="text-base font-semibold text-ink mb-2">Compliance Trend (last 6 completed months)</h3>
+                    <div id="auditTrend" class="flex items-end gap-2 h-32"></div>
+                </div>
+
+                <!-- Exceptions -->
+                <div>
+                    <h3 class="text-base font-semibold text-ink mb-2">Exceptions <span id="auditExceptionCount" class="badge badge-err ml-1"></span></h3>
+                    <div id="auditExceptions" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- Leader Audit Tool -->
+            <div class="bg-white rounded-xl border border-line p-4 md:p-6" style="box-shadow:0 1px 2px rgba(0,0,0,.04)">
+                <p class="section-label mb-1">Leader Audit Tool — Defibrillator Monthly Review</p>
+                <h2 class="text-xl font-semibold mb-4"><i class="fa-solid fa-user-check mr-2"></i>Digital Leader Audit</h2>
+                <p class="text-sm text-muted mb-4">Scope follows the dashboard filters (a specific unit and month must be selected). Auto-calculated from live entries.</p>
+
+                <div id="leaderAuditBody">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                        <div>
+                            <label for="laDepartment" class="block text-sm font-medium text-ink mb-1.5">Department</label>
+                            <input type="text" id="laDepartment" class="field">
+                        </div>
+                        <div>
+                            <label for="laUnitLocation" class="block text-sm font-medium text-ink mb-1.5">Unit / Location</label>
+                            <input type="text" id="laUnitLocation" class="field">
+                        </div>
+                        <div>
+                            <label for="laAssetTag" class="block text-sm font-medium text-ink mb-1.5">Defibrillator Asset Tag</label>
+                            <input type="text" id="laAssetTag" class="field">
+                        </div>
+                        <div>
+                            <label for="laMonthYear" class="block text-sm font-medium text-ink mb-1.5">Month / Year Audited</label>
+                            <input type="text" id="laMonthYear" class="field" readonly>
+                        </div>
+                        <div>
+                            <label for="laAuditor" class="block text-sm font-medium text-ink mb-1.5">Auditor Name & Title</label>
+                            <input type="text" id="laAuditor" class="field">
+                        </div>
+                        <div>
+                            <label for="laAuditDate" class="block text-sm font-medium text-ink mb-1.5">Date of Audit</label>
+                            <input type="date" id="laAuditDate" class="field">
+                        </div>
+                    </div>
+
+                    <h3 class="text-base font-semibold text-ink mb-2">1. Documentation Completeness Review</h3>
+                    <div class="overflow-x-auto border border-line rounded-lg mb-5">
+                        <table class="min-w-full divide-y divide-line text-sm">
+                            <thead class="bg-surface">
+                                <tr>
+                                    <th class="px-3 py-3 text-left font-medium text-muted uppercase text-xs tracking-wider">Criteria</th>
+                                    <th class="px-3 py-3 text-center font-medium text-muted uppercase text-xs tracking-wider">Yes</th>
+                                    <th class="px-3 py-3 text-center font-medium text-muted uppercase text-xs tracking-wider">No</th>
+                                </tr>
+                            </thead>
+                            <tbody id="laSection1" class="bg-white divide-y divide-line"></tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-base font-semibold text-ink mb-2">2. Compliance Calculation</h3>
+                    <div class="overflow-x-auto border border-line rounded-lg mb-4">
+                        <table class="min-w-full divide-y divide-line text-sm tnum">
+                            <thead class="bg-surface">
+                                <tr>
+                                    <th class="px-3 py-3 text-left font-medium text-muted uppercase text-xs tracking-wider">Metric</th>
+                                    <th class="px-3 py-3 text-left font-medium text-muted uppercase text-xs tracking-wider">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody id="laSection2" class="bg-white divide-y divide-line"></tbody>
+                        </table>
+                    </div>
+                    <div id="laVerdict" class="mb-4"></div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="laResponsibleLeader" class="block text-sm font-medium text-ink mb-1.5">Responsible Leader</label>
+                            <input type="text" id="laResponsibleLeader" class="field">
+                        </div>
+                    </div>
+                    <p class="text-sm text-muted mb-4">Target Completion Date is the 9th of each month.</p>
+
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <button id="laSaveBtn" class="btn-primary"><i class="fa-solid fa-save mr-2"></i>Save Leader Audit</button>
+                        <button id="laPrintBtn" class="btn-secondary"><i class="fa-solid fa-print mr-2"></i>Print Leader Audit</button>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- ==================== TAB: SETTINGS ==================== -->
         <div id="settings" class="tab-content">
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-                <h2 class="text-xl font-bold mb-4 border-b pb-2"><i class="fa-solid fa-bell mr-2"></i>Automation & Alerts</h2>
-                <p class="text-sm text-gray-600 mb-4">
+            <div class="bg-white rounded-xl border border-line p-4 md:p-6 mb-6" style="box-shadow:0 1px 2px rgba(0,0,0,.04)">
+                <p class="section-label mb-1">Settings</p>
+                <h2 class="text-xl font-semibold mb-3"><i class="fa-solid fa-bell mr-2"></i>Automation & Alerts</h2>
+                <p class="text-sm text-muted mb-4">
                     The app runs a background check every minute. If it is <strong>08:30 AM</strong>, it verifies if an entry exists for the previous day.
                 </p>
                 <div class="mb-4">
-                    <label for="webhookUrl" class="block text-sm font-medium text-gray-700 mb-1">Webhook URL (Make.com, Zapier)</label>
-                    <input type="url" id="webhookUrl" placeholder="https://hook.make.com/..." class="w-full rounded-md border-gray-300 p-2 border">
+                    <label for="webhookUrl" class="block text-sm font-medium text-ink mb-1.5">Webhook URL (Make.com, Zapier)</label>
+                    <input type="url" id="webhookUrl" placeholder="https://hook.make.com/..." class="field">
                 </div>
-                <div class="flex gap-2">
-                    <button id="saveWebhookBtn" class="bg-gray-800 text-white text-sm font-semibold py-2 px-4 rounded">Save Webhook</button>
-                    <button id="testWebhookBtn" class="bg-purple-600 text-white text-sm font-semibold py-2 px-4 rounded"><i class="fa-solid fa-flask mr-1"></i> Test Trigger</button>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <button id="saveWebhookBtn" class="btn-primary h-11 text-sm">Save Webhook</button>
+                    <button id="testWebhookBtn" class="btn-secondary"><i class="fa-solid fa-flask"></i> Test Trigger</button>
                 </div>
             </div>
 
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div class="flex justify-between items-center mb-4 border-b pb-2">
-                    <h2 class="text-xl font-bold"><i class="fa-solid fa-file-word mr-2"></i>Word Template Manager</h2>
-                    <div id="docxStatus" class="text-sm font-medium text-gray-600">Checking template...</div>
+            <div class="bg-white rounded-xl border border-line p-4 md:p-6" style="box-shadow:0 1px 2px rgba(0,0,0,.04)">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-xl font-semibold"><i class="fa-solid fa-file-word mr-2"></i>Word Template Manager</h2>
+                    <div id="docxStatus" class="text-sm font-medium text-muted">Checking template...</div>
                 </div>
 
-                <p class="text-sm text-gray-600 mb-2">
+                <p class="text-sm text-muted mb-2">
                     Monthly Word forms are filled directly into an official <strong>.docx crash cart log</strong> — no PDF calibration needed.
                     The app reads the day rows (1–31) in the document's table and writes each entry into the matching row automatically.
                 </p>
-                <p class="text-sm text-gray-600 mb-4">
+                <p class="text-sm text-muted mb-4">
                     <strong>If the crash cart log is ever revised</strong>, simply upload the new Word file below.
                     As long as it keeps the same day-row table layout (days 1–31 in the first column), it will work immediately — no recalibration required.
                 </p>
 
-                <div id="docxTemplateInfo" class="text-sm bg-gray-50 border rounded-md p-3 mb-4 text-gray-700"></div>
+                <div id="docxTemplateInfo" class="text-sm bg-surface border border-line rounded-lg p-3 mb-4 text-ink"></div>
 
                 <div class="mb-4 flex flex-wrap gap-4 items-center">
-                    <input type="file" id="docxUploader" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="block text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border p-1 rounded-md">
+                    <input type="file" id="docxUploader" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="block text-sm text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border file:border-line file:bg-white file:text-ink hover:file:bg-stone-100 border border-line p-1 rounded-lg">
                 </div>
-                <div class="flex flex-wrap gap-2">
-                    <button id="downloadTemplateBtn" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded"><i class="fa-solid fa-download mr-1"></i> Download Current Template</button>
-                    <button id="resetTemplateBtn" class="bg-gray-700 hover:bg-gray-800 text-white text-sm font-semibold py-2 px-4 rounded hidden"><i class="fa-solid fa-rotate-left mr-1"></i> Reset to Default Template</button>
+                <div class="flex flex-col sm:flex-row flex-wrap gap-2">
+                    <button id="downloadTemplateBtn" class="btn-secondary"><i class="fa-solid fa-download"></i> Download Current Template</button>
+                    <button id="resetTemplateBtn" class="btn-secondary hidden"><i class="fa-solid fa-rotate-left"></i> Reset to Default Template</button>
                 </div>
-                <div id="docxUploadError" class="hidden mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2"></div>
+                <div id="docxUploadError" class="hidden mt-3 text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg p-2"></div>
+            </div>
+
+            <div class="bg-white rounded-xl border border-line p-4 md:p-6 mt-6" style="box-shadow:0 1px 2px rgba(0,0,0,.04)">
+                <p class="section-label mb-1">Firebase</p>
+                <h2 class="text-xl font-semibold mb-3"><i class="fa-solid fa-shield-halved mr-2"></i>Monthly Forms Access</h2>
+                <p class="text-sm text-muted mb-3">
+                    If Monthly Forms shows an archive access warning, add an authenticated rule for the
+                    <code>monthly_forms</code> collection in Firebase Console → Firestore Database → Rules:
+                </p>
+                <pre class="bg-stone-900 text-stone-100 text-xs rounded-lg p-3 overflow-x-auto"><code>match /monthly_forms/{formId} {
+  allow read, write: if request.auth != null;
+}</code></pre>
+                <p class="text-xs text-muted mt-3">
+                    The app can still show live forms without this rule, but the saved archive, running-form persistence,
+                    and saved Leader Audit metadata require it.
+                </p>
             </div>
         </div>
 
@@ -327,6 +588,21 @@
 
     <!-- Hidden print area for monthly form -->
     <div id="printArea" class="hidden"></div>
+
+    <!-- Inline document viewer modal (popup-free) -->
+    <div id="docViewerModal" class="fixed inset-0 bg-black bg-opacity-60 hidden z-50 flex items-center justify-center p-2 md:p-4">
+        <div id="docViewerSheet" class="bg-white rounded-xl shadow-xl w-full max-w-6xl mx-auto flex flex-col border border-line" style="max-height:95vh;">
+            <div class="p-3 border-b border-line flex justify-between items-center gap-2 bg-surface rounded-t-xl sticky top-0">
+                <h3 id="docViewerTitle" class="text-base md:text-lg font-semibold text-ink truncate">Monthly Form</h3>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button id="docViewerPrintBtn" class="no-print btn-secondary !h-11 !px-3"><i class="fa-solid fa-print"></i><span class="hidden sm:inline"> Print</span></button>
+                    <button id="docViewerPdfBtn" class="no-print btn-secondary !h-11 !px-3"><i class="fa-solid fa-file-pdf"></i><span class="hidden sm:inline"> PDF</span></button>
+                    <button id="docViewerCloseBtn" aria-label="Close document viewer" class="no-print inline-flex items-center justify-center h-11 w-11 rounded-lg text-muted hover:text-ink hover:bg-stone-100"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+            </div>
+            <div id="docViewerBody" class="monthly-form-scroll p-2 md:p-4 overflow-auto flex-grow bg-stone-100"></div>
+        </div>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -356,7 +632,7 @@
         function showToast(message, isError = false) {
             const toast = document.getElementById('toast');
             toast.querySelector('#toast-msg').textContent = message;
-            toast.className = `fixed top-4 right-4 px-6 py-3 rounded-md shadow-lg transform transition-all duration-300 z-50 ${isError ? 'bg-red-500' : 'bg-green-500'} text-white`;
+            toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 z-50 ${isError ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-emerald-700 text-white'}`;
             setTimeout(() => { toast.classList.remove('translate-x-full', 'opacity-0'); }, 10);
             setTimeout(() => { toast.classList.add('translate-x-full', 'opacity-0'); }, 3000);
         }
@@ -364,14 +640,14 @@
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => {
-                el.classList.remove('bg-blue-700', 'border-white', 'text-white');
-                el.classList.add('border-transparent', 'hover:bg-blue-700', 'text-blue-100');
+                el.classList.remove('bg-white', 'text-brand-900');
+                el.classList.add('text-brand-100', 'hover:text-white');
             });
             document.getElementById(tabId).classList.add('active');
             const btn = document.getElementById('tab-btn-' + tabId);
             if(btn) {
-                btn.classList.add('bg-blue-700', 'border-white', 'text-white');
-                btn.classList.remove('border-transparent', 'hover:bg-blue-700', 'text-blue-100');
+                btn.classList.add('bg-white', 'text-brand-900');
+                btn.classList.remove('text-brand-100', 'hover:text-white');
             }
         }
 
@@ -380,11 +656,11 @@
             document.getElementById('modalTitle').textContent = "Confirm Deletion";
             document.getElementById('modalMessage').textContent = "Are you sure you want to delete this entry?";
             document.getElementById('modalMessage').classList.remove('hidden');
-            document.getElementById('modalContainer').className = "bg-white rounded-lg shadow-xl w-full max-w-sm mx-auto flex flex-col max-h-full";
+            document.getElementById('modalContainer').className = "bg-white rounded-xl shadow-xl w-full max-w-sm mx-auto flex flex-col max-h-full border border-line";
             document.getElementById('modalCancelBtn').classList.remove('hidden');
             const confirmBtn = document.getElementById('modalConfirmBtn');
             confirmBtn.textContent = "Delete";
-            confirmBtn.className = "px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700";
+            confirmBtn.className = "inline-flex items-center justify-center h-11 px-4 text-sm font-semibold rounded-lg bg-red-700 text-white hover:bg-red-800";
             confirmBtn.onclick = async () => {
                 if(deleteIdPending) {
                     await deleteDoc(doc(db, 'crashcart_logs', deleteIdPending));
@@ -411,14 +687,28 @@
             document.getElementById('tab-btn-log').addEventListener('click', () => switchTab('log'));
             document.getElementById('tab-btn-review').addEventListener('click', () => switchTab('review'));
             document.getElementById('tab-btn-forms').addEventListener('click', () => { switchTab('forms'); loadSavedForms(); });
+            document.getElementById('tab-btn-audit').addEventListener('click', () => {
+                switchTab('audit');
+                renderAuditDashboard();
+                // Refresh monthly_forms metadata in the background so archive-related
+                // audit rules do not report false "missing form" exceptions.
+                loadSavedForms();
+            });
             document.getElementById('tab-btn-settings').addEventListener('click', () => switchTab('settings'));
 
             document.getElementById('filterMonth').addEventListener('change', renderTable);
             document.getElementById('filterYear').addEventListener('change', renderTable);
             document.getElementById('filterUnit').addEventListener('change', renderTable);
 
-            document.getElementById('viewMonthlyFormBtn').addEventListener('click', () => generateMonthlyForm(false));
-            document.getElementById('printMonthlyFormBtn').addEventListener('click', () => generateMonthlyForm(true));
+            document.getElementById('viewMonthlyFormBtn').addEventListener('click', openCurrentMonthViewer);
+            document.getElementById('printMonthlyFormBtn').addEventListener('click', printCurrentMonthViewer);
+            document.getElementById('downloadPdfBtn').addEventListener('click', downloadCurrentMonthPdf);
+            document.getElementById('docViewerCloseBtn').addEventListener('click', closeDocViewer);
+            document.getElementById('docViewerPrintBtn').addEventListener('click', printDocViewer);
+            document.getElementById('docViewerPdfBtn').addEventListener('click', downloadViewerPdf);
+            document.getElementById('docViewerModal').addEventListener('click', (ev) => {
+                if (ev.target === document.getElementById('docViewerModal')) closeDocViewer();
+            });
 
             document.getElementById('downloadWordBtn').addEventListener('click', downloadMonthlyWord);
             document.getElementById('saveWebhookBtn').addEventListener('click', saveWebhook);
@@ -430,15 +720,49 @@
             document.getElementById('modalCloseIcon').addEventListener('click', hideModal);
             document.getElementById('modalCancelBtn').addEventListener('click', hideModal);
 
+            // Unit-scoped suggestions refresh whenever the selected location changes.
+            document.getElementById('unit').addEventListener('change', () => updateSuggestions(allEntries));
+
+            // +1y/+2y/+3y quick chips set the expiration picker to today + N years.
+            document.querySelectorAll('[data-exp-years]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const yrs = parseInt(btn.getAttribute('data-exp-years'), 10);
+                    const d = new Date();
+                    d.setFullYear(d.getFullYear() + yrs);
+                    const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                    document.getElementById('expDate').value = iso;
+                    document.getElementById('expDate').focus();
+                });
+            });
+
+            ['cb1','cb2','cb3','cb4','cb5','cb6','cb7','cb8'].forEach(id =>
+                document.getElementById(id).addEventListener('change', updateChecksCounter));
+            updateChecksCounter();
+
+            // Duplicate-entry early warning when unit or date matches an existing entry.
+            document.getElementById('unit').addEventListener('change', checkDuplicateWarning);
+            document.getElementById('entryDate').addEventListener('change', checkDuplicateWarning);
+            document.getElementById('duplicateWarningDismiss').addEventListener('click', () =>
+                document.getElementById('duplicateWarning').classList.add('hidden'));
+
+            ['auditYear','auditMonth','auditUnit','auditOnlyExceptions'].forEach(id =>
+                document.getElementById(id).addEventListener('change', renderAuditDashboard));
+            document.getElementById('laSaveBtn').addEventListener('click', saveLeaderAudit);
+            document.getElementById('laPrintBtn').addEventListener('click', printLeaderAudit);
+
             const currentYear = new Date().getFullYear();
             const yearSelect = document.getElementById('filterYear');
+            const auditYearSelect = document.getElementById('auditYear');
             for(let i = currentYear - 2; i <= currentYear + 2; i++) {
                 const opt = document.createElement('option');
                 opt.value = i; opt.textContent = i;
                 if(i === currentYear) opt.selected = true;
                 yearSelect.appendChild(opt);
+                auditYearSelect.appendChild(opt.cloneNode(true));
             }
             document.getElementById('filterMonth').value = String(new Date().getMonth() + 1).padStart(2, '0');
+            document.getElementById('auditMonth').value = String(new Date().getMonth() + 1).padStart(2, '0');
+            document.getElementById('auditYear').value = String(currentYear);
 
             refreshTemplateStatus();
             startBackgroundCheck();
@@ -454,16 +778,16 @@
                 currentUser = user;
                 loginOverlay.classList.add('opacity-0', 'pointer-events-none');
                 setTimeout(() => loginOverlay.classList.add('hidden'), 300);
-                authStatus.innerText = "Logged In";
-                authStatus.classList.replace('text-yellow-300', 'text-green-300');
+                authStatus.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>Signed in';
+                authStatus.className = 'inline-flex items-center gap-1.5 text-sm font-medium text-brand-200 whitespace-nowrap';
                 logoutBtn.classList.remove('hidden');
                 loadAllData();
             } else {
                 currentUser = null;
                 loginOverlay.classList.remove('hidden');
                 setTimeout(() => loginOverlay.classList.remove('opacity-0', 'pointer-events-none'), 10);
-                authStatus.innerText = "Logged Out";
-                authStatus.classList.replace('text-green-300', 'text-yellow-300');
+                authStatus.innerHTML = '<span class="w-2 h-2 rounded-full bg-brand-200 inline-block"></span>Signed out';
+                authStatus.className = 'inline-flex items-center gap-1.5 text-sm font-medium text-brand-200 whitespace-nowrap';
                 logoutBtn.classList.add('hidden');
                 allEntries = [];
                 renderTable();
@@ -506,6 +830,8 @@
                 updateSuggestions(allEntries);
                 renderTable();
                 checkAndAutoSaveMonthlyForm();
+                if (document.getElementById('audit').classList.contains('active')) renderAuditDashboard();
+                checkDuplicateWarning();
             });
         }
 
@@ -516,14 +842,96 @@
             document.getElementById('entryTime').value = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
         }
 
+        // All suggestions are scoped to the unit selected in the Daily Log form.
         function updateSuggestions(data) {
-            const staffSet = new Set(), lock1Set = new Set(), lock2Set = new Set();
-            data.forEach(e => { if(e.staffName) staffSet.add(e.staffName); if(e.lock1) lock1Set.add(e.lock1); if(e.lock2) lock2Set.add(e.lock2); });
+            const unit = document.getElementById('unit').value;
+            const scoped = unit ? data.filter(e => e.unit === unit) : [];
+            const staffSet = new Set(), lock1Set = new Set(), lock2Set = new Set(), expSet = new Set();
+            scoped.forEach(e => {
+                if(e.staffName) staffSet.add(e.staffName);
+                if(e.lock1) lock1Set.add(e.lock1);
+                if(e.lock2) lock2Set.add(e.lock2);
+                if(e.expDate) expSet.add(e.expDate);
+            });
             const populate = (id, set) => {
                 const dl = document.getElementById(id);
                 if(dl) { dl.innerHTML = ''; set.forEach(v => dl.appendChild(new Option(v, v))); }
             };
             populate('staff-suggestions', staffSet); populate('lock1-suggestions', lock1Set); populate('lock2-suggestions', lock2Set);
+            renderExpSuggestions(expSet, unit);
+        }
+
+        const UNIT_LABELS = { a: 'Unit A', b: 'Unit B', c: 'Unit C', d: 'Unit D', mobile: 'Mobile' };
+
+        // Parse a stored "MM/DD/YY" expDate string into { iso, display } for the date picker.
+        // Two-digit years are mapped to 20YY.
+        function parseStoredExpDate(v) {
+            const m = String(v || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+            if (!m) return null;
+            const mm = m[1].padStart(2, '0'), dd = m[2].padStart(2, '0');
+            let yy = m[3]; if (yy.length === 2) yy = '20' + yy;
+            const iso = yy + '-' + mm + '-' + dd;
+            const display = mm + '/' + dd + '/' + yy.slice(2);
+            return { iso: iso, display: display };
+        }
+
+        function renderExpSuggestions(expSet, unit) {
+            const wrap = document.getElementById('expSuggestionsWrap');
+            const label = document.getElementById('expSuggestionsLabel');
+            const box = document.getElementById('expSuggestions');
+            box.innerHTML = '';
+            if (!unit || expSet.size === 0) { wrap.classList.add('hidden'); return; }
+            const items = Array.from(expSet).map(parseStoredExpDate).filter(Boolean);
+            // De-dupe by display value, most recent year first.
+            const seen = new Set();
+            const unique = items.filter(i => !seen.has(i.display) && seen.add(i.display))
+                                .sort((a, b) => b.iso.localeCompare(a.iso)).slice(0, 6);
+            if (unique.length === 0) { wrap.classList.add('hidden'); return; }
+            label.textContent = 'Recent for ' + (UNIT_LABELS[unit] || unit) + ':';
+            unique.forEach(item => {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'chip tnum';
+                chip.textContent = item.display;
+                chip.addEventListener('click', () => {
+                    document.getElementById('expDate').value = item.iso;
+                    document.getElementById('expDate').focus();
+                });
+                box.appendChild(chip);
+            });
+            wrap.classList.remove('hidden');
+        }
+
+        // Single source of truth for "defib test passed": new docs store cb8;
+        // legacy docs (pre-cb8) inherit the pass result from cb7.
+        function testPassed(e) { return e.cb8 !== undefined ? !!e.cb8 : !!e.cb7; }
+
+        function updateChecksCounter() {
+            const n = ['cb1','cb2','cb3','cb4','cb5','cb6','cb7'].filter(id => document.getElementById(id).checked).length;
+            const pass = document.getElementById('cb8') && document.getElementById('cb8').checked;
+            document.getElementById('checksCounter').innerHTML = esc(n + ' of 7 checked') +
+                (pass ? ' <span class="badge badge-ok ml-1">Pass ✓</span>' : '');
+        }
+
+        function findExistingEntry(unit, dateVal) {
+            return allEntries.find(e => e.unit === unit && e.date === dateVal);
+        }
+
+        function checkDuplicateWarning() {
+            const banner = document.getElementById('duplicateWarning');
+            const txt = document.getElementById('duplicateWarningText');
+            const unit = document.getElementById('unit').value;
+            const dateVal = document.getElementById('entryDate').value;
+            if (!unit || !dateVal) { banner.classList.add('hidden'); return; }
+            const existing = findExistingEntry(unit, dateVal);
+            if (!existing) { banner.classList.add('hidden'); return; }
+            const d = new Date(dateVal + 'T12:00:00');
+            const dateLabel = isNaN(d) ? dateVal : d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+            txt.innerHTML = 'A check for <strong>' + esc(UNIT_LABELS[unit] || unit) + ' on ' + esc(dateLabel) + '</strong> was already completed' +
+                (existing.staffName ? ' by <strong>' + esc(existing.staffName) + '</strong>' : '') +
+                (existing.submittedBy ? ' (' + esc(existing.submittedBy) + ')' : '') +
+                (existing.time ? ' at ' + esc(existing.time) : '') + '. Saving again will create a flagged duplicate.';
+            banner.classList.remove('hidden');
         }
 
         async function handleFormSubmit(e) {
@@ -532,7 +940,14 @@
 
             const btn = document.getElementById('saveBtn');
             btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Saving...';
-            const dateVal = document.getElementById('entryDate').value; 
+            const dateVal = document.getElementById('entryDate').value;
+
+            // Convert the native date picker value (YYYY-MM-DD) to the stored MM/DD/YY format
+            // so the monthly form, Word and PDF outputs remain unchanged.
+            const expRaw = document.getElementById('expDate').value; // YYYY-MM-DD from type=date
+            let expStored = expRaw;
+            const isoMatch = expRaw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (isoMatch) expStored = isoMatch[2] + '/' + isoMatch[3] + '/' + isoMatch[1].slice(2);
 
             const entryData = {
                 unit: document.getElementById('unit').value,
@@ -540,20 +955,42 @@
                 day: parseInt(dateVal.split('-')[2], 10), month: dateVal.split('-')[1], year: dateVal.split('-')[0],
                 time: document.getElementById('entryTime').value || '',
                 lock1: document.getElementById('lock1').value, lock2: document.getElementById('lock2').value,
-                expDate: document.getElementById('expDate').value,
+                expDate: expStored,
                 cb1: document.getElementById('cb1').checked, cb2: document.getElementById('cb2').checked,
                 cb3: document.getElementById('cb3').checked, cb4: document.getElementById('cb4').checked,
                 cb5: document.getElementById('cb5').checked, cb6: document.getElementById('cb6').checked,
                 cb7: document.getElementById('cb7').checked,
+                cb8: document.getElementById('cb8').checked,
+                schemaVersion: 2,
                 staffName: document.getElementById('staffName').value,
                 timestamp: Date.now(), submittedBy: currentUser.email
             };
+
+            // Duplicate audit safeguard: notify and require explicit confirmation.
+            const existing = findExistingEntry(entryData.unit, dateVal);
+            if (existing) {
+                const existingDetails = [];
+                if (existing.staffName) existingDetails.push('by ' + existing.staffName);
+                if (existing.time) existingDetails.push(existing.time);
+                const ok = window.confirm('An audit for ' + (UNIT_LABELS[entryData.unit] || entryData.unit) + ' on ' + dateVal +
+                    ' already exists' + (existingDetails.length ? ' (' + existingDetails.join(', ') + ')' : '') +
+                    '.\n\nSave a duplicate anyway? It will be flagged as a duplicate.');
+                if (!ok) {
+                    btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save mr-2"></i> Save Entry';
+                    checkDuplicateWarning();
+                    document.getElementById('duplicateWarning').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return;
+                }
+                entryData.isDuplicate = true;
+            }
 
             try {
                 await addDoc(collection(db, 'crashcart_logs'), entryData);
                 showToast("Entry saved successfully!");
                 document.getElementById('entryForm').reset();
-                initDateFields(); 
+                initDateFields();
+                updateChecksCounter();
+                updateSuggestions(allEntries); // unit reset clears scoped suggestions
                 checkAndAutoSaveMonthlyForm();
             } catch (err) { showToast("Error saving. Check rules.", true); } 
             finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-save mr-2"></i> Save Entry'; }
@@ -561,30 +998,78 @@
 
         function renderTable() {
             const tbody = document.getElementById('dataTable');
+            const cards = document.getElementById('entryCards');
+            const summary = document.getElementById('reviewSummary');
             tbody.innerHTML = '';
+            cards.innerHTML = '';
             const m = document.getElementById('filterMonth').value;
             const y = document.getElementById('filterYear').value;
             const u = document.getElementById('filterUnit').value;
+            const unitLabel = UNIT_LABELS[u] || ('Unit ' + String(u).toUpperCase());
 
             const filtered = allEntries.filter(e => e.month === m && e.year === y && e.unit === u).sort((a, b) => a.day - b.day);
 
+            // Status summary line for the selected unit/month/year.
+            const { daysInMonth, isComplete } = monthCompletion(allEntries, u, m, y);
+            const monthName = MONTH_NAMES[parseInt(m, 10)] || m;
+            const statusBadge = isComplete
+                ? '<span class="badge badge-ok">Complete</span>'
+                : '<span class="badge badge-warn">Running</span>';
+            summary.innerHTML = '<span class="font-semibold text-ink">' + unitLabel + '</span> · ' + monthName + ' ' + y +
+                ' — ' + filtered.length + ' of ' + daysInMonth + ' days documented &nbsp;' + statusBadge;
+
+            const checksBadge = n => '<span class="badge tnum ' + (n === 7 ? 'badge-ok' : 'badge-err') + '">' + n + '/7</span>';
+            const delBtn = id => '<button class="delete-btn inline-flex items-center justify-center h-11 w-11 rounded-lg text-red-600 hover:bg-red-50" aria-label="Delete entry" data-id="' + id + '"><i class="fa-solid fa-trash"></i></button>';
+            const shortDate = entry => {
+                const d = new Date(entry.year + '-' + entry.month + '-' + String(entry.day).padStart(2,'0') + 'T12:00:00');
+                return isNaN(d) ? 'Day ' + entry.day : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            };
+
             if(filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="px-3 py-4 text-center text-gray-500">No entries found for ' + m + '/' + y + ' in Unit ' + u + '</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="px-3 py-4 text-center text-muted">No entries found for ' + m + '/' + y + ' in ' + unitLabel + '</td></tr>';
+                cards.innerHTML = '<div class="border border-line rounded-lg p-6 text-center">' +
+                    '<p class="text-sm text-muted mb-3">No entries yet for ' + unitLabel + ' · ' + monthName + ' ' + y + '.</p>' +
+                    '<button type="button" id="goToLogBtn" class="btn-secondary">Go to Daily Log</button></div>';
+                const goBtn = document.getElementById('goToLogBtn');
+                if (goBtn) goBtn.addEventListener('click', () => switchTab('log'));
                 return;
             }
+
+            // Flag unit+date collisions (or explicitly stamped duplicates) in the review list.
+            const dayCounts = {};
+            filtered.forEach(e => { dayCounts[e.day] = (dayCounts[e.day] || 0) + 1; });
+            const dupBadge = entry => (dayCounts[entry.day] > 1 || entry.isDuplicate)
+                ? ' <span class="badge badge-warn ml-1">Dup</span>' : '';
+            const passChip = entry => testPassed(entry)
+                ? ' <span class="badge badge-ok ml-1">Pass</span>'
+                : ' <span class="badge badge-warn ml-1">No result</span>';
 
             filtered.forEach(entry => {
                 const checks = [entry.cb1, entry.cb2, entry.cb3, entry.cb4, entry.cb5, entry.cb6, entry.cb7].filter(Boolean).length;
                 const tr = document.createElement('tr');
-                tr.innerHTML = '<td class="px-3 py-2 whitespace-nowrap">' + entry.day + '</td>' +
-                    '<td class="px-3 py-2 whitespace-nowrap text-xs">' + (entry.lock1 || '') + '</td>' +
-                    '<td class="px-3 py-2 whitespace-nowrap text-xs">' + (entry.lock2 || '') + '</td>' +
-                    '<td class="px-3 py-2 whitespace-nowrap text-xs">' + (entry.expDate || '') + '</td>' +
-                    '<td class="px-3 py-2 whitespace-nowrap text-center text-sm font-semibold ' + (checks === 7 ? 'text-green-600' : 'text-red-600') + '">' + checks + '/7</td>' +
-                    '<td class="px-3 py-2 whitespace-nowrap text-xs">' + (entry.staffName || '') + '</td>' +
-                    '<td class="px-3 py-2 whitespace-nowrap text-center">' +
-                    '<button class="delete-btn text-red-500 hover:text-red-700 p-1" data-id="' + entry.id + '"><i class="fa-solid fa-trash"></i></button></td>';
+                tr.innerHTML = '<td class="px-3 py-2 whitespace-nowrap">' + entry.day + dupBadge(entry) + '</td>' +
+                    '<td class="px-3 py-2 whitespace-nowrap text-xs">' + esc(entry.lock1) + '</td>' +
+                    '<td class="px-3 py-2 whitespace-nowrap text-xs">' + esc(entry.lock2) + '</td>' +
+                    '<td class="px-3 py-2 whitespace-nowrap text-xs">' + esc(entry.expDate) + '</td>' +
+                    '<td class="px-3 py-2 whitespace-nowrap text-center">' + checksBadge(checks) + passChip(entry) + '</td>' +
+                    '<td class="px-3 py-2 whitespace-nowrap text-xs">' + esc(entry.staffName) + '</td>' +
+                    '<td class="px-3 py-2 whitespace-nowrap text-center">' + delBtn(entry.id) + '</td>';
                 tbody.appendChild(tr);
+
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-line rounded-lg p-3';
+                card.innerHTML =
+                    '<div class="flex items-center justify-between gap-2">' +
+                        '<div class="font-semibold text-ink tnum">' + shortDate(entry) + dupBadge(entry) + '</div>' +
+                        '<div class="flex items-center gap-2 flex-wrap justify-end">' + checksBadge(checks) + passChip(entry) + delBtn(entry.id) + '</div>' +
+                    '</div>' +
+                    '<div class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">' +
+                        '<div><span class="text-muted text-xs">Lock #1</span><div class="tnum">' + esc(entry.lock1) + '</div></div>' +
+                        '<div><span class="text-muted text-xs">Lock #2</span><div class="tnum">' + esc(entry.lock2) + '</div></div>' +
+                        '<div><span class="text-muted text-xs">Exp Date</span><div class="tnum">' + esc(entry.expDate) + '</div></div>' +
+                        '<div><span class="text-muted text-xs">Staff</span><div>' + esc(entry.staffName) + '</div></div>' +
+                    '</div>';
+                cards.appendChild(card);
             });
 
             document.querySelectorAll('.delete-btn').forEach(btn => {
@@ -592,49 +1077,66 @@
             });
         }
 
-        // ========== MONTHLY FORM GENERATION (NO pdf-lib NEEDED) ==========
-        function generateMonthlyFormHTML(unit, month, year, entries) {
-            const monthNames = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
-            const monthName = monthNames[parseInt(month)];
-            const daysInMonth = new Date(parseInt(year), parseInt(month), 0).getDate();
+        // Escape any user-supplied value before injecting it into generated HTML.
+        function esc(v) {
+            return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
 
-            const sortedEntries = entries.filter(e => e.unit === unit && e.month === month && e.year === year)
-                                         .sort((a, b) => a.day - b.day);
+        const MONTH_NAMES = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
+
+        // A month is complete when an entry exists for its last calendar day,
+        // regardless of today's date.
+        function monthCompletion(entries, unit, month, year) {
+            const daysInMonth = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+            const matching = entries.filter(e => e.unit === unit && e.month === month && e.year === year);
+            const isComplete = matching.some(e => parseInt(e.day, 10) === daysInMonth);
+            return { daysInMonth, entries: matching, isComplete };
+        }
+
+        // ========== MONTHLY FORM GENERATION ==========
+        function generateMonthlyFormHTML(unit, month, year, entries) {
+            const monthName = MONTH_NAMES[parseInt(month, 10)] || month;
+            const { daysInMonth, entries: matching, isComplete } = monthCompletion(entries, unit, month, year);
 
             const entryByDay = {};
-            sortedEntries.forEach(e => entryByDay[e.day] = e);
+            matching.forEach(e => entryByDay[e.day] = e);
 
+            const CHK = '\u2611', UNCHK = '\u2610';
             let rows = '';
             for (let d = 1; d <= daysInMonth; d++) {
                 const e = entryByDay[d];
                 if (e) {
+                    const cb = v => v ? CHK : UNCHK;
                     rows += '<tr>' +
                         '<td class="day-col">' + d + '</td>' +
-                        '<td class="lock-col">' + (e.lock1 || '') + '</td>' +
-                        '<td class="lock-col">' + (e.lock2 || '') + '</td>' +
-                        '<td class="exp-col">' + (e.expDate || '') + '</td>' +
-                        '<td class="check-col">' + (e.cb1 ? 'X' : '') + '</td>' +
-                        '<td class="check-col">' + (e.cb2 ? 'X' : '') + '</td>' +
-                        '<td class="check-col">' + (e.cb3 ? 'X' : '') + '</td>' +
-                        '<td class="check-col">' + (e.cb4 ? 'X' : '') + '</td>' +
-                        '<td class="check-col">' + (e.cb5 ? 'X' : '') + '</td>' +
-                        '<td class="check-col">' + (e.cb6 ? 'X' : '') + '</td>' +
-                        '<td class="check-col">' + (e.cb7 ? 'X' : '') + '</td>' +
-                        '<td class="staff-col">' + (e.staffName || '') + '</td>' +
+                        '<td class="time-col">' + esc(e.time) + '</td>' +
+                        '<td class="lock-col">' + esc(e.lock1) + '</td>' +
+                        '<td class="lock-col">' + esc(e.lock2) + '</td>' +
+                        '<td class="exp-col">' + esc(e.expDate) + '</td>' +
+                        '<td class="check-col">' + cb(e.cb1) + '</td>' +
+                        '<td class="check-col">' + cb(e.cb2) + '</td>' +
+                        '<td class="check-col">' + cb(e.cb3) + '</td>' +
+                        '<td class="check-col">' + cb(e.cb4) + '</td>' +
+                        '<td class="check-col">' + cb(e.cb5) + '</td>' +
+                        '<td class="check-col">' + cb(e.cb6) + '</td>' +
+                        '<td class="check-col">' + cb(e.cb7) + '</td>' +
+                        '<td class="test-col">' + (testPassed(e) ? 'Pass' : '') + '</td>' +
+                        '<td class="check-col">' + cb(e.cb7) + '</td>' +
+                        '<td class="staff-col">' + esc(e.staffName) + '</td>' +
                         '</tr>';
                 } else {
                     rows += '<tr>' +
                         '<td class="day-col">' + d + '</td>' +
+                        '<td class="time-col"></td>' +
                         '<td class="lock-col"></td>' +
                         '<td class="lock-col"></td>' +
                         '<td class="exp-col"></td>' +
-                        '<td class="check-col"></td>' +
-                        '<td class="check-col"></td>' +
-                        '<td class="check-col"></td>' +
-                        '<td class="check-col"></td>' +
-                        '<td class="check-col"></td>' +
-                        '<td class="check-col"></td>' +
-                        '<td class="check-col"></td>' +
+                        ('<td class="check-col">' + UNCHK + '</td>').repeat(6) +
+                        '<td class="check-col">' + UNCHK + '</td>' +
+                        '<td class="test-col"></td>' +
+                        '<td class="check-col">' + UNCHK + '</td>' +
                         '<td class="staff-col"></td>' +
                         '</tr>';
                 }
@@ -643,14 +1145,16 @@
             return '<div class="monthly-form">' +
                 '<h2>CRASH CART & DEFIBRILLATOR DAILY CHECK</h2>' +
                 '<div class="header-row">' +
-                '<div><strong>Unit:</strong> ' + unit.toUpperCase() + '</div>' +
-                '<div><strong>Month:</strong> ' + monthName + '</div>' +
-                '<div><strong>Year:</strong> ' + year + '</div>' +
+                '<div><strong>Unit:</strong> ' + esc(String(unit).toUpperCase()) + '</div>' +
+                '<div><strong>Month:</strong> ' + esc(monthName) + '</div>' +
+                '<div><strong>Year:</strong> ' + esc(year) + '</div>' +
+                '<div><strong>Status:</strong> ' + (isComplete ? 'Complete' : 'Running (' + matching.length + ' entries)') + '</div>' +
                 '</div>' +
                 '<table>' +
                 '<thead>' +
                 '<tr>' +
                 '<th class="day-col">Day</th>' +
+                '<th class="time-col">Time</th>' +
                 '<th class="lock-col">Lock #1</th>' +
                 '<th class="lock-col">Lock #2</th>' +
                 '<th class="exp-col">Exp Date</th>' +
@@ -660,7 +1164,9 @@
                 '<th class="check-col">C4</th>' +
                 '<th class="check-col">C5</th>' +
                 '<th class="check-col">C6</th>' +
-                '<th class="check-col">C7</th>' +
+                '<th class="check-col">Power</th>' +
+                '<th class="test-col">Test Result</th>' +
+                '<th class="check-col">O2</th>' +
                 '<th class="staff-col">Staff</th>' +
                 '</tr>' +
                 '</thead>' +
@@ -668,205 +1174,395 @@
                 '</table>' +
                 '<div style="margin-top: 15px; font-size: 10px; color: #666;">' +
                 '<strong>C1</strong>=Manual Resus Bag | <strong>C2</strong>=2 Pack Paper | <strong>C3</strong>=Electrodes | ' +
-                '<strong>C4</strong>=EKG Pads | <strong>C5</strong>=Weight Tape | <strong>C6</strong>=Code Binder | <strong>C7</strong>=Defib/O2' +
+                '<strong>C4</strong>=EKG Pads | <strong>C5</strong>=Weight Tape | <strong>C6</strong>=Code Binder | ' +
+                '<strong>Power/O2</strong>=Defib. Power & O2 Tank &gt; 2000 psi (Pass when checked)' +
                 '</div>' +
                 '</div>';
         }
 
-        function generateMonthlyForm(shouldPrint) {
-            const m = document.getElementById('filterMonth').value;
-            const y = document.getElementById('filterYear').value;
-            const u = document.getElementById('filterUnit').value;
+        // ========== INLINE DOCUMENT VIEWER (no popups) ==========
+        let docViewerContext = null; // { unit, month, year }
+        let docViewerReturnFocus = null;
 
-            const html = generateMonthlyFormHTML(u, m, y, allEntries);
-            document.getElementById('printArea').innerHTML = html;
-            document.getElementById('printArea').classList.remove('hidden');
+        function openDocViewer(unit, month, year, formHtmlOverride) {
+            const html = formHtmlOverride || generateMonthlyFormHTML(unit, month, year, allEntries);
+            docViewerContext = { unit, month, year };
+            docViewerReturnFocus = document.activeElement;
+            const monthName = MONTH_NAMES[parseInt(month, 10)] || month;
+            document.getElementById('docViewerTitle').textContent =
+                'Monthly Form - Unit ' + String(unit).toUpperCase() + ' ' + monthName + ' ' + year;
+            document.getElementById('docViewerBody').innerHTML = html;
+            document.getElementById('docViewerModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            document.getElementById('docViewerCloseBtn').focus();
+        }
 
-            if (shouldPrint) {
-                setTimeout(() => {
-                    window.print();
-                    document.getElementById('printArea').classList.add('hidden');
-                }, 200);
-            } else {
-                const previewWindow = window.open('', '_blank', 'width=900,height=1100');
-                previewWindow.document.write('<!DOCTYPE html><html><head><title>Monthly Form - Unit ' + u + ' ' + m + '/' + y + '</title>' +
-                    '<style>' +
-                    'body { font-family: Arial, sans-serif; padding: 20px; background: #f3f4f6; }' +
-                    '.monthly-form { background: white; padding: 20px; max-width: 800px; margin: 0 auto; border: 2px solid #000; }' +
-                    '.monthly-form h2 { text-align: center; margin-bottom: 10px; font-size: 18px; }' +
-                    '.monthly-form .header-row { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 14px; }' +
-                    '.monthly-form table { width: 100%; border-collapse: collapse; font-size: 11px; }' +
-                    '.monthly-form th, .monthly-form td { border: 1px solid #333; padding: 4px 6px; text-align: center; }' +
-                    '.monthly-form th { background: #e5e7eb; font-weight: bold; font-size: 10px; }' +
-                    '.monthly-form td { height: 28px; }' +
-                    '.day-col { width: 30px; }' +
-                    '.lock-col { width: 70px; }' +
-                    '.exp-col { width: 60px; }' +
-                    '.check-col { width: 28px; }' +
-                    '.staff-col { width: 100px; }' +
-                    '.print-btn { display: block; margin: 20px auto; padding: 10px 30px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }' +
-                    '.print-btn:hover { background: #1d4ed8; }' +
-                    '@media print { .print-btn { display: none; } body { background: white; padding: 0; } }' +
-                    '</style></head><body>' + html + '<button class="print-btn" onclick="window.print()">Print / Save as PDF</button></body></html>');
-                previewWindow.document.close();
-                document.getElementById('printArea').classList.add('hidden');
+        function closeDocViewer() {
+            docViewerContext = null;
+            document.getElementById('docViewerModal').classList.add('hidden');
+            document.body.style.overflow = '';
+            if (docViewerReturnFocus && docViewerReturnFocus.focus) docViewerReturnFocus.focus();
+            docViewerReturnFocus = null;
+        }
+
+        document.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Escape') {
+                if (!document.getElementById('docViewerModal').classList.contains('hidden')) closeDocViewer();
+                else if (!document.getElementById('customModal').classList.contains('hidden')) hideModal();
+            }
+        });
+
+        function openCurrentMonthViewer() {
+            openDocViewer(
+                document.getElementById('filterUnit').value,
+                document.getElementById('filterMonth').value,
+                document.getElementById('filterYear').value
+            );
+        }
+
+        function printDocViewer() {
+            const printArea = document.getElementById('printArea');
+            printArea.innerHTML = document.getElementById('docViewerBody').innerHTML;
+            printArea.classList.remove('hidden');
+            setTimeout(() => {
+                window.print();
+                printArea.classList.add('hidden');
+            }, 150);
+        }
+
+        function printCurrentMonthViewer() {
+            openCurrentMonthViewer();
+            printDocViewer();
+        }
+
+        // ========== DIRECT PDF DOWNLOAD (jsPDF + AutoTable, no window.print) ==========
+        function downloadMonthlyPdf(unit, month, year, entries) {
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                showToast('PDF library failed to load. Check your connection and try again.', true);
+                return;
+            }
+            try {
+                const monthName = MONTH_NAMES[parseInt(month, 10)] || month;
+                const { daysInMonth, entries: matching, isComplete } = monthCompletion(entries, unit, month, year);
+                const entryByDay = {};
+                matching.forEach(e => entryByDay[e.day] = e);
+
+                // jsPDF's built-in Helvetica does not embed the Unicode ballot-box glyphs.
+                // Use PDF-safe X/blank marks here; the Word file still uses ☑/☐.
+                const CHK = 'X', UNCHK = '';
+                const body = [];
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const e = entryByDay[d];
+                    const cb = v => (v ? CHK : UNCHK);
+                    if (e) {
+                        body.push([String(d), e.time || '', e.lock1 || '', e.lock2 || '', e.expDate || '',
+                            cb(e.cb1), cb(e.cb2), cb(e.cb3), cb(e.cb4), cb(e.cb5), cb(e.cb6),
+                            cb(e.cb7), testPassed(e) ? 'Pass' : '', cb(e.cb7), e.staffName || '']);
+                    } else {
+                        body.push([String(d), '', '', '', '', UNCHK, UNCHK, UNCHK, UNCHK, UNCHK, UNCHK, UNCHK, '', UNCHK, '']);
+                    }
+                }
+
+                const docPdf = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
+                docPdf.setFontSize(14);
+                docPdf.text('CRASH CART & DEFIBRILLATOR DAILY CHECK', docPdf.internal.pageSize.getWidth() / 2, 30, { align: 'center' });
+                docPdf.setFontSize(11);
+                docPdf.text(
+                    'Unit: ' + String(unit).toUpperCase() + '    Month: ' + monthName + '    Year: ' + year +
+                    '    Status: ' + (isComplete ? 'Complete' : 'Running (' + matching.length + ' entries)'),
+                    docPdf.internal.pageSize.getWidth() / 2, 48, { align: 'center' });
+                docPdf.autoTable({
+                    startY: 60,
+                    head: [['Day','Time','Lock #1','Lock #2','Exp Date','C1','C2','C3','C4','C5','C6','Power','Test Result','O2','Staff']],
+                    body: body,
+                    styles: { fontSize: 7, cellPadding: 2, halign: 'center' },
+                    headStyles: { fillColor: [19, 78, 74], fontSize: 7 },
+                    columnStyles: { 0: { cellWidth: 26 }, 14: { halign: 'left' } },
+                    theme: 'grid'
+                });
+                docPdf.save('CrashCart_' + String(unit).toUpperCase() + '_' + month + '_' + year + '.pdf');
+                showToast('PDF downloaded!');
+            } catch (err) {
+                console.error('PDF generation error:', err);
+                showToast('PDF generation failed: ' + err.message, true);
             }
         }
 
-        // ========== AUTO-SAVE MONTHLY FORM LOGIC ==========
-        async function checkAndAutoSaveMonthlyForm() {
+        function downloadCurrentMonthPdf() {
+            downloadMonthlyPdf(
+                document.getElementById('filterUnit').value,
+                document.getElementById('filterMonth').value,
+                document.getElementById('filterYear').value,
+                allEntries
+            );
+        }
+
+        function downloadViewerPdf() {
+            if (!docViewerContext) return;
+            downloadMonthlyPdf(docViewerContext.unit, docViewerContext.month, docViewerContext.year, allEntries);
+        }
+
+        // ========== RUNNING MONTHLY FORM AUTO-SAVE ==========
+        // A running monthly_forms document is maintained per unit/month/year whenever
+        // entries exist. isComplete is true when an entry exists for the last calendar
+        // day of that entry's month, regardless of today's date.
+        let monthlyFormSyncTimer = null;
+        const monthlyFormHashes = {}; // formId -> hash of last synced payload
+        let monthlyFormsWriteToastShown = false; // avoid repeating the same rules warning
+
+        function checkAndAutoSaveMonthlyForm() {
+            if (!currentUser || allEntries.length === 0) return;
+            if (monthlyFormSyncTimer) clearTimeout(monthlyFormSyncTimer);
+            monthlyFormSyncTimer = setTimeout(syncMonthlyForms, 800); // debounce snapshot bursts
+        }
+
+        async function syncMonthlyForms() {
             if (!currentUser || allEntries.length === 0) return;
 
             const groups = {};
             allEntries.forEach(e => {
+                if (!e.unit || !e.month || !e.year) return;
                 const key = e.unit + '_' + e.month + '_' + e.year;
                 if (!groups[key]) groups[key] = [];
                 groups[key].push(e);
             });
 
-            const today = new Date();
-            const currentMonth = String(today.getMonth() + 1).padStart(2, '0');
-            const currentYear = String(today.getFullYear());
-            const currentDay = today.getDate();
-            const lastDayOfMonth = new Date(parseInt(currentYear), parseInt(currentMonth), 0).getDate();
-
             for (const key in groups) {
                 const parts = key.split('_');
-                const unit = parts[0];
-                const month = parts[1];
-                const year = parts[2];
-                const entries = groups[key];
+                const unit = parts[0], month = parts[1], year = parts[2];
+                const groupEntries = groups[key];
+                const { isComplete } = monthCompletion(allEntries, unit, month, year);
+                const daysDocumented = groupEntries.map(e => e.day).sort((a, b) => a - b);
 
-                const isMonthComplete = (month === currentMonth && year === currentYear && currentDay >= lastDayOfMonth) ||
-                                        (parseInt(year) < parseInt(currentYear)) ||
-                                        (year === currentYear && parseInt(month) < parseInt(currentMonth));
-
-                if (!isMonthComplete) continue;
-
+                // Hash guard: skip the write if nothing meaningful changed.
+                const hash = JSON.stringify([isComplete, groupEntries.length, daysDocumented,
+                    groupEntries.map(e => [e.day, e.time, e.lock1, e.lock2, e.expDate, e.staffName,
+                                           e.cb1, e.cb2, e.cb3, e.cb4, e.cb5, e.cb6, e.cb7, e.cb8])]);
                 const formId = 'form_' + unit + '_' + month + '_' + year;
-                const formRef = doc(db, 'monthly_forms', formId);
+                if (monthlyFormHashes[formId] === hash) continue;
 
+                const formRef = doc(db, 'monthly_forms', formId);
                 try {
-                    const snap = await getDoc(formRef);
-                    if (!snap.exists()) {
-                        const formHTML = generateMonthlyFormHTML(unit, month, year, allEntries);
-                        let formDocxBase64 = null;
-                        try {
-                            const blob = await buildMonthlyDocx(unit, month, year, allEntries);
-                            formDocxBase64 = await blobToBase64(blob);
-                        } catch (docxErr) {
-                            console.warn("Could not pre-generate Word form:", docxErr);
-                        }
-                        const formData = {
-                            unit: unit,
-                            month: month,
-                            year: year,
-                            formHTML: formHTML,
-                            formDocxBase64: formDocxBase64,
-                            entryCount: entries.length,
-                            savedAt: Date.now(),
-                            savedBy: currentUser.email,
-                            daysDocumented: entries.map(e => e.day).sort((a,b) => a-b)
-                        };
-                        await setDoc(formRef, formData);
-                        showToast('Auto-saved monthly form: Unit ' + unit.toUpperCase() + ' ' + month + '/' + year);
+                    const formData = {
+                        unit: unit,
+                        month: month,
+                        year: year,
+                        status: isComplete ? 'complete' : 'running',
+                        isComplete: isComplete,
+                        entryCount: groupEntries.length,
+                        daysDocumented: daysDocumented,
+                        formHTML: generateMonthlyFormHTML(unit, month, year, allEntries),
+                        updatedAt: Date.now(),
+                        savedAt: Date.now(),
+                        savedBy: currentUser.email
+                    };
+                    try {
+                        const blob = await buildMonthlyDocx(unit, month, year, allEntries);
+                        formData.formDocxBase64 = await blobToBase64(blob);
+                    } catch (docxErr) {
+                        console.warn("Could not pre-generate Word form:", docxErr);
+                        // Intentionally omit formDocxBase64 rather than storing null.
                     }
+                    // Firestore 1 MiB document limit guard: the base64 docx is regenerable
+                    // client-side, so drop it first if the payload gets too large.
+                    const payloadSize = (formData.formHTML || '').length + (formData.formDocxBase64 || '').length;
+                    if (payloadSize > 900 * 1024 && formData.formDocxBase64) {
+                        console.warn('Monthly form payload too large (' + payloadSize + ' bytes); omitting formDocxBase64.');
+                        delete formData.formDocxBase64;
+                    }
+                    await setDoc(formRef, formData);
+                    monthlyFormHashes[formId] = hash;
                 } catch (err) {
-                    console.error("Auto-save form error:", err);
+                    console.error("Monthly form sync error:", err);
+                    if (err && err.code === 'permission-denied') {
+                        if (!monthlyFormsWriteToastShown) {
+                            monthlyFormsWriteToastShown = true;
+                            showToast('Monthly forms archive is blocked by Firestore rules. Live forms remain available; see Settings → Monthly Forms Access.', true);
+                        }
+                    } else {
+                        showToast('Monthly form sync failed: ' + (err && err.message ? err.message : 'unknown error'), true);
+                    }
                 }
             }
         }
 
         // ========== LOAD SAVED FORMS ==========
+        // Metadata from the most recent successful monthly_forms read, reused by the
+        // audit dashboard (late/stale form rules) and the Leader Audit save.
+        let savedFormsMeta = {};
+        let formsAccessDenied = false;
+
+        // Derive running form descriptors straight from loaded entries, so the tab stays
+        // useful even when Firestore rules deny the monthly_forms collection.
+        function deriveLiveForms() {
+            const groups = {};
+            allEntries.forEach(e => {
+                if (!e.unit || !e.month || !e.year) return;
+                const key = e.unit + '_' + e.month + '_' + e.year;
+                if (!groups[key]) groups[key] = { unit: e.unit, month: e.month, year: e.year, entries: [] };
+                groups[key].entries.push(e);
+            });
+            return Object.values(groups).map(g => {
+                const { isComplete } = monthCompletion(allEntries, g.unit, g.month, g.year);
+                return {
+                    id: 'live_' + g.unit + '_' + g.month + '_' + g.year,
+                    unit: g.unit, month: g.month, year: g.year,
+                    isComplete: isComplete,
+                    entryCount: g.entries.length,
+                    updatedAt: Math.max.apply(null, g.entries.map(e => e.timestamp || 0)),
+                    live: true
+                };
+            });
+        }
+
+        function renderFormCards(forms, opts) {
+            const container = document.getElementById('savedFormsList');
+            const grouped = {};
+            forms.forEach(f => {
+                if (!grouped[f.year]) grouped[f.year] = {};
+                if (!grouped[f.year][f.month]) grouped[f.year][f.month] = {};
+                grouped[f.year][f.month][f.unit] = f;
+            });
+
+            let html = opts && opts.banner ? opts.banner : '';
+            Object.keys(grouped).sort((a,b) => b - a).forEach(year => {
+                html += '<div class="mb-4"><h3 class="text-lg font-semibold text-ink mb-2 tnum">' + esc(year) + '</h3>';
+                Object.keys(grouped[year]).sort((a,b) => b - a).forEach(month => {
+                    html += '<div class="ml-2 md:ml-4 mb-3"><h4 class="text-base font-semibold text-muted mb-1">' + esc(MONTH_NAMES[parseInt(month, 10)] || month) + '</h4><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">';
+                    Object.keys(grouped[year][month]).sort().forEach(unit => {
+                        const f = grouped[year][month][unit];
+                        const isComplete = f.isComplete || f.status === 'complete';
+                        const dateStr = f.updatedAt || f.savedAt ? new Date(f.updatedAt || f.savedAt).toLocaleDateString() : '';
+                        const badge = isComplete
+                            ? '<span class="badge badge-ok">Complete</span>'
+                            : '<span class="badge badge-warn">Running</span>';
+                        const openFn = f.live ? 'window.openLiveForm' : 'window.openSavedForm';
+                        const wordFn = f.live ? 'window.downloadLiveFormWord' : 'window.downloadSavedFormWord';
+                        html += '<div class="bg-white border border-line rounded-lg p-3 hover:bg-surface transition cursor-pointer" role="button" tabindex="0" onclick="' + openFn + '(\'' + f.id + '\')">' +
+                            '<div class="flex items-center justify-between gap-2"><div class="font-semibold text-ink">' + esc(UNIT_LABELS[unit] || ('Unit ' + String(unit).toUpperCase())) + '</div>' + badge + '</div>' +
+                            '<div class="text-xs text-muted mt-1 tnum">' + (f.entryCount || 0) + ' entries</div>' +
+                            '<div class="text-xs text-faint">' + (f.live ? 'Live from entries' : 'Updated ' + dateStr) + '</div>' +
+                            '<button class="btn-secondary mt-2 !h-9 text-xs" onclick="event.stopPropagation(); ' + wordFn + '(\'' + f.id + '\')"><i class="fa-solid fa-file-word"></i> Word</button>' +
+                            '</div>';
+                    });
+                    html += '</div></div>';
+                });
+                html += '</div>';
+            });
+            container.innerHTML = html;
+        }
+
         async function loadSavedForms() {
             const container = document.getElementById('savedFormsList');
-            container.innerHTML = '<div class="text-gray-500 text-center py-4"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading...</div>';
+            container.innerHTML = '<div class="text-muted text-center py-4"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading...</div>';
 
+            if (!currentUser) {
+                container.innerHTML = '<div class="text-muted text-center py-8">Sign in to view monthly forms.</div>';
+                return;
+            }
+
+            let querySnapshot = null;
             try {
-                const formsRef = collection(db, 'monthly_forms');
-                const q = query(formsRef, orderBy("savedAt", "desc"));
-                const querySnapshot = await getDocs(q);
-
-                const forms = [];
-                querySnapshot.forEach(docSnap => {
-                    if (docSnap.id.startsWith('form_')) {
-                        forms.push({ id: docSnap.id, ...docSnap.data() });
+                querySnapshot = await getDocs(query(collection(db, 'monthly_forms'), orderBy('savedAt', 'desc')));
+            } catch (e1) {
+                console.warn('Ordered monthly_forms query failed, retrying unordered:', e1);
+                try {
+                    querySnapshot = await getDocs(collection(db, 'monthly_forms'));
+                } catch (e2) {
+                    console.error('monthly_forms read denied/failed:', e2);
+                    if (e2 && e2.code === 'permission-denied') {
+                        formsAccessDenied = true;
+                        // Rules deny the archive: keep the tab useful with live-derived forms.
+                        const live = deriveLiveForms();
+                        savedFormsMeta = {};
+                        if (live.length === 0) {
+                            container.innerHTML = formsDeniedBanner() + formsEmptyState();
+                        } else {
+                            renderFormCards(live, { banner: formsDeniedBanner() });
+                        }
+                        if (document.getElementById('audit').classList.contains('active')) renderAuditDashboard();
+                        return;
                     }
-                });
-
-                if (forms.length === 0) {
-                    container.innerHTML = '<div class="text-gray-500 text-center py-8">No saved monthly forms yet. Forms auto-save when a month is complete.</div>';
+                    renderFormsError(e2);
                     return;
                 }
-
-                const grouped = {};
-                forms.forEach(f => {
-                    const y = f.year;
-                    const m = f.month;
-                    const u = f.unit;
-                    if (!grouped[y]) grouped[y] = {};
-                    if (!grouped[y][m]) grouped[y][m] = {};
-                    grouped[y][m][u] = f;
-                });
-
-                let html = '';
-                const monthNames = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
-
-                Object.keys(grouped).sort((a,b) => b - a).forEach(year => {
-                    html += '<div class="mb-4"><h3 class="text-lg font-bold text-gray-800 mb-2">' + year + '</h3>';
-                    Object.keys(grouped[year]).sort((a,b) => b - a).forEach(month => {
-                        html += '<div class="ml-4 mb-3"><h4 class="text-md font-semibold text-gray-700 mb-1">' + monthNames[parseInt(month)] + '</h4><div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">';
-                        Object.keys(grouped[year][month]).sort().forEach(unit => {
-                            const f = grouped[year][month][unit];
-                            const dateStr = new Date(f.savedAt).toLocaleDateString();
-                            html += '<div class="bg-gray-50 border rounded p-3 hover:bg-blue-50 transition cursor-pointer" onclick="window.openSavedForm(\'' + f.id + '\')">' +
-                                '<div class="font-bold text-blue-800">Unit ' + unit.toUpperCase() + '</div>' +
-                                '<div class="text-xs text-gray-500">' + f.entryCount + ' entries</div>' +
-                                '<div class="text-xs text-gray-400">Saved ' + dateStr + '</div>' +
-                                '<button class="mt-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-1 px-2 rounded" onclick="event.stopPropagation(); window.downloadSavedFormWord(\'' + f.id + '\')"><i class="fa-solid fa-file-word mr-1"></i>Word</button>' +
-                                '</div>';
-                        });
-                        html += '</div></div>';
-                    });
-                    html += '</div>';
-                });
-
-                container.innerHTML = html;
-            } catch (err) {
-                console.error("Load forms error:", err);
-                container.innerHTML = '<div class="text-red-500 text-center py-4">Error loading forms. Please try again.</div>';
             }
+
+            formsAccessDenied = false;
+            const forms = [];
+            querySnapshot.forEach(docSnap => {
+                if (docSnap.id.startsWith('form_')) forms.push({ id: docSnap.id, ...docSnap.data() });
+            });
+            // Client-side sort (ordered query silently drops docs missing savedAt).
+            forms.sort((a, b) => (b.savedAt || b.updatedAt || 0) - (a.savedAt || a.updatedAt || 0));
+
+            savedFormsMeta = {};
+            forms.forEach(f => { savedFormsMeta[f.id] = f; });
+
+            if (forms.length === 0) {
+                container.innerHTML = formsEmptyState();
+                if (document.getElementById('audit').classList.contains('active')) renderAuditDashboard();
+                return;
+            }
+            renderFormCards(forms);
+            if (document.getElementById('audit').classList.contains('active')) renderAuditDashboard();
         }
+
+        function formsEmptyState() {
+            return '<div class="border border-line rounded-lg p-6 text-center">' +
+                '<p class="text-sm text-muted mb-3">No monthly forms yet. A running form appears automatically after the first daily entry for a unit/month.</p>' +
+                '<button type="button" class="btn-secondary" onclick="window._goToDailyLog()">Go to Daily Log</button></div>';
+        }
+        window._goToDailyLog = function() { switchTab('log'); };
+
+        function formsDeniedBanner() {
+            return '<div class="border border-amber-200 bg-amber-50 text-amber-900 rounded-lg p-3 text-sm mb-4 flex items-start gap-2">' +
+                '<i class="fa-solid fa-triangle-exclamation mt-0.5 shrink-0"></i><div>' +
+                '<strong>Showing live forms built from your daily entries.</strong> The persistent forms archive ' +
+                '(<code>monthly_forms</code>) is blocked by Firestore security rules. Ask the admin to allow authenticated ' +
+                'reads/writes on <code>monthly_forms</code> (see Settings documentation) to enable the saved archive.' +
+                '</div></div>';
+        }
+
+        function renderFormsError(err) {
+            const container = document.getElementById('savedFormsList');
+            const offline = err && (err.code === 'unavailable' || err.code === 'network-request-failed');
+            const msg = offline
+                ? 'You appear to be offline or the network dropped. Check your connection and retry.'
+                : 'Error loading forms: ' + (err && err.message ? esc(err.message) : 'unknown error');
+            container.innerHTML = '<div class="border border-red-200 bg-red-50 text-red-800 rounded-lg p-4 text-center">' +
+                '<p class="text-sm mb-3">' + msg + '</p>' +
+                '<button type="button" class="btn-secondary" onclick="window._retryLoadForms()"><i class="fa-solid fa-rotate-right mr-1"></i> Retry</button></div>';
+        }
+        window._retryLoadForms = function() { loadSavedForms(); };
+
+        window.openLiveForm = function(formId) {
+            const parts = formId.split('_'); // live_unit_month_year
+            openDocViewer(parts[1], parts[2], parts[3]);
+        };
+
+        window.downloadLiveFormWord = async function(formId) {
+            const parts = formId.split('_');
+            try {
+                const blob = await buildMonthlyDocx(parts[1], parts[2], parts[3], allEntries);
+                downloadBlob(blob, 'CrashCart_' + parts[1].toUpperCase() + '_' + parts[2] + '_' + parts[3] + '.docx');
+                showToast('Word form downloaded!');
+            } catch (err) {
+                console.error(err);
+                showToast('Could not generate Word file: ' + err.message, true);
+            }
+        };
 
         window.openSavedForm = async function(formId) {
             try {
                 const snap = await getDoc(doc(db, 'monthly_forms', formId));
-                if (snap.exists()) {
-                    const data = snap.data();
-                    const previewWindow = window.open('', '_blank', 'width=900,height=1100');
-                    previewWindow.document.write('<!DOCTYPE html><html><head><title>Saved Form - Unit ' + data.unit.toUpperCase() + ' ' + data.month + '/' + data.year + '</title>' +
-                        '<style>' +
-                        'body { font-family: Arial, sans-serif; padding: 20px; background: #f3f4f6; }' +
-                        '.monthly-form { background: white; padding: 20px; max-width: 800px; margin: 0 auto; border: 2px solid #000; }' +
-                        '.monthly-form h2 { text-align: center; margin-bottom: 10px; font-size: 18px; }' +
-                        '.monthly-form .header-row { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 14px; }' +
-                        '.monthly-form table { width: 100%; border-collapse: collapse; font-size: 11px; }' +
-                        '.monthly-form th, .monthly-form td { border: 1px solid #333; padding: 4px 6px; text-align: center; }' +
-                        '.monthly-form th { background: #e5e7eb; font-weight: bold; font-size: 10px; }' +
-                        '.monthly-form td { height: 28px; }' +
-                        '.day-col { width: 30px; }' +
-                        '.lock-col { width: 70px; }' +
-                        '.exp-col { width: 60px; }' +
-                        '.check-col { width: 28px; }' +
-                        '.staff-col { width: 100px; }' +
-                        '.print-btn { display: block; margin: 20px auto; padding: 10px 30px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }' +
-                        '.print-btn:hover { background: #1d4ed8; }' +
-                        '@media print { .print-btn { display: none; } body { background: white; padding: 0; } }' +
-                        '</style></head><body>' + data.formHTML + '<button class="print-btn" onclick="window.print()">Print / Save as PDF</button></body></html>');
-                    previewWindow.document.close();
-                }
+                if (!snap.exists()) return showToast("Form not found.", true);
+                const data = snap.data();
+                // Prefer live entries for the month; fall back to the stored HTML snapshot.
+                const hasLive = allEntries.some(e => e.unit === data.unit && e.month === data.month && e.year === data.year);
+                openDocViewer(data.unit, data.month, data.year, hasLive ? null : data.formHTML);
             } catch (err) {
-                alert("Error opening form: " + err.message);
+                showToast("Error opening form: " + err.message, true);
             }
         };
 
@@ -1157,6 +1853,7 @@
                     setCheckbox(colMap.cb6, cb(e.cb6));
                     setCheckbox(colMap.power, cb(e.cb7));   // defib power cord
                     setCheckbox(colMap.o2,    cb(e.cb7));   // O2 tank
+                    setText(colMap.test, testPassed(e) ? 'Pass' : ''); // defib test result (cb8, cb7 for legacy docs)
                     setText(colMap.staff, e.staffName || '');
                 }
             }
@@ -1200,14 +1897,14 @@
                 let meta = {};
                 try { meta = JSON.parse(metaRaw); } catch (e) {}
                 statusEl.textContent = 'Custom Template Active';
-                statusEl.className = 'text-sm font-medium text-green-600';
+                statusEl.className = 'text-sm font-medium text-emerald-700';
                 infoEl.innerHTML = '<strong>Source:</strong> Custom upload<br>' +
                     '<strong>File:</strong> ' + (meta.name || 'unknown') + '<br>' +
                     '<strong>Uploaded:</strong> ' + (meta.date || 'unknown');
                 resetBtn.classList.remove('hidden');
             } else {
                 statusEl.textContent = 'Default Template Active';
-                statusEl.className = 'text-sm font-medium text-blue-600';
+                statusEl.className = 'text-sm font-medium text-brand-700';
                 infoEl.innerHTML = '<strong>Source:</strong> Built-in default (<code>crash-cart-template.docx</code>)<br>' +
                     'Upload a revised crash cart log below to replace it.';
                 resetBtn.classList.add('hidden');
@@ -1280,7 +1977,424 @@
                     checkMissingEntry();
                     localStorage.setItem('lastAutoCheck', todayStr);
                 }
-            }, 60000); 
+            }, 60000);
+        }
+
+        // ========== AUDIT DASHBOARD ==========
+        const AUDIT_UNITS = ['a','b','c','d','mobile'];
+
+        function entryCheckCount(e) {
+            return [e.cb1, e.cb2, e.cb3, e.cb4, e.cb5, e.cb6, e.cb7].filter(Boolean).length;
+        }
+        function entryFullyCompliant(e) {
+            return entryCheckCount(e) === 7 && testPassed(e) && !!(e.staffName && String(e.staffName).trim());
+        }
+
+        // Months in scope for the dashboard filters: [{month:'07', year:'2025'}...]
+        function auditMonthsInScope() {
+            const y = document.getElementById('auditYear').value || String(new Date().getFullYear());
+            const m = document.getElementById('auditMonth').value;
+            if (m !== 'all') return [{ month: m, year: y }];
+            const out = [];
+            for (let i = 1; i <= 12; i++) out.push({ month: String(i).padStart(2, '0'), year: y });
+            return out;
+        }
+        function auditUnitsInScope() {
+            const u = document.getElementById('auditUnit').value;
+            return u === 'all' ? AUDIT_UNITS.slice() : [u];
+        }
+
+        // Compliance for one unit/month: fully-compliant days / expected calendar days.
+        function complianceFor(unit, month, year) {
+            const { daysInMonth, entries } = monthCompletion(allEntries, unit, month, year);
+            const fully = entries.filter(entryFullyCompliant).length;
+            return { expected: daysInMonth, documented: entries.length, fully: fully,
+                     pct: daysInMonth ? Math.round(100 * fully / daysInMonth) : null };
+        }
+
+        // Audit-of-audit rules from the spec; each exception links back to Monthly Review.
+        function runAuditChecks(units, months) {
+            const exceptions = [];
+            const now = new Date();
+            const curM = now.getMonth() + 1, curY = now.getFullYear();
+            const unitsInUse = {};
+            allEntries.forEach(e => { if (e.unit) unitsInUse[e.unit] = true; });
+
+            units.forEach(unit => {
+                months.forEach(({ month, year }) => {
+                    const mi = parseInt(month, 10), yi = parseInt(year, 10);
+                    const isFuture = yi > curY || (yi === curY && mi > curM);
+                    if (isFuture) return;
+                    const { daysInMonth, entries, isComplete } = monthCompletion(allEntries, unit, month, year);
+                    const isPastMonth = yi < curY || (yi === curY && mi < curM);
+                    const unitLabel = UNIT_LABELS[unit] || unit;
+                    const scope = { unit: unit, month: month, year: year };
+
+                    // Rule 1: missing days (months with entries, or past months for units in use)
+                    const daysWith = {};
+                    entries.forEach(e => { daysWith[parseInt(e.day, 10)] = (daysWith[parseInt(e.day, 10)] || 0) + 1; });
+                    const lastExpectedDay = isPastMonth ? daysInMonth
+                        : (yi === curY && mi === curM ? now.getDate() : 0);
+                    if (lastExpectedDay > 0 && (entries.length > 0 || unitsInUse[unit])) {
+                        const missing = [];
+                        for (let d = 1; d <= lastExpectedDay; d++) if (!daysWith[d]) missing.push(d);
+                        if (missing.length > 0) {
+                            exceptions.push({ severity: 'err', ...scope, rule: 'missing-day',
+                                message: unitLabel + ' · ' + MONTH_NAMES[mi] + ' ' + year + ': ' + missing.length +
+                                    ' day(s) not documented (' + missing.slice(0, 10).join(', ') + (missing.length > 10 ? ', …' : '') + ')' });
+                        }
+                    }
+
+                    entries.forEach(e => {
+                        const dayScope = { ...scope, day: e.day };
+                        // Rule 2: incomplete equipment checks
+                        if (entryCheckCount(e) < 7) exceptions.push({ severity: 'warn', ...dayScope, rule: 'incomplete-day',
+                            message: unitLabel + ' day ' + e.day + ': only ' + entryCheckCount(e) + ' of 7 equipment checks completed' });
+                        // Rule 3: missing defib test result
+                        if (!testPassed(e)) exceptions.push({ severity: 'warn', ...dayScope, rule: 'no-test-result',
+                            message: unitLabel + ' day ' + e.day + ': defib test result not recorded as Pass' });
+                        // Rule 4: missing staff initials
+                        if (!e.staffName || !String(e.staffName).trim()) exceptions.push({ severity: 'err', ...dayScope, rule: 'no-staff',
+                            message: unitLabel + ' day ' + e.day + ': staff initials/name missing' });
+                        // Rule 5: missing lock/expiry data
+                        if (!e.lock1 || !e.lock2 || !e.expDate) exceptions.push({ severity: 'warn', ...dayScope, rule: 'no-lock-exp',
+                            message: unitLabel + ' day ' + e.day + ': missing lock number(s) or expiration date' });
+                        // Rule 6: duplicate day
+                        if (daysWith[parseInt(e.day, 10)] > 1 || e.isDuplicate) exceptions.push({ severity: 'warn', ...dayScope, rule: 'duplicate',
+                            message: unitLabel + ' day ' + e.day + ': duplicate entry for the same unit/date' });
+                    });
+
+                    // Rules 7 & 8: monthly_forms archive metadata (skipped silently when rules deny access)
+                    if (!formsAccessDenied) {
+                        const formId = 'form_' + unit + '_' + month + '_' + year;
+                        const meta = savedFormsMeta[formId];
+                        if (isPastMonth && entries.length > 0) {
+                            if (!meta) {
+                                exceptions.push({ severity: 'err', ...scope, rule: 'late-form',
+                                    message: unitLabel + ' · ' + MONTH_NAMES[mi] + ' ' + year + ': no saved monthly form found in the archive' });
+                            } else if (meta.status === 'running' || meta.isComplete === false) {
+                                exceptions.push({ severity: 'warn', ...scope, rule: 'stale-form',
+                                    message: unitLabel + ' · ' + MONTH_NAMES[mi] + ' ' + year + ': saved form is still marked Running after month end' });
+                            } else {
+                                // Target completion: 9th of the following month
+                                const deadline = new Date(yi, mi, 9); // month index mi = next month
+                                const updated = meta.updatedAt || meta.savedAt;
+                                if (updated && updated > deadline.getTime()) {
+                                    exceptions.push({ severity: 'err', ...scope, rule: 'late-form',
+                                        message: unitLabel + ' · ' + MONTH_NAMES[mi] + ' ' + year + ': monthly form finalized after the 9th of the following month' });
+                                }
+                            }
+                        }
+                    }
+
+                    // Rule 9: monthly compliance below 99%
+                    const comp = complianceFor(unit, month, year);
+                    if (isPastMonth && comp.expected > 0 && comp.documented > 0 && comp.pct < 99) {
+                        exceptions.push({ severity: 'err', ...scope, rule: 'low-compliance',
+                            message: unitLabel + ' · ' + MONTH_NAMES[mi] + ' ' + year + ': compliance ' + comp.pct + '% (< 99% — action required)' });
+                    }
+                });
+            });
+            return exceptions;
+        }
+
+        function auditExceptionRow(ex) {
+            const sevBadge = ex.severity === 'err'
+                ? '<span class="badge badge-err">Error</span>'
+                : '<span class="badge badge-warn">Warning</span>';
+            return '<div class="border border-line rounded-lg p-3 flex items-start justify-between gap-2 bg-white">' +
+                '<div class="flex items-start gap-2">' + sevBadge +
+                '<div class="text-sm text-ink">' + esc(ex.message) + '</div></div>' +
+                '<button type="button" class="btn-secondary !h-9 text-xs shrink-0" onclick="window.reviewException(\'' +
+                    esc(ex.unit) + '\',\'' + esc(ex.month) + '\',\'' + esc(ex.year) + '\')">Review</button></div>';
+        }
+
+        window.reviewException = function(unit, month, year) {
+            document.getElementById('filterUnit').value = unit;
+            document.getElementById('filterMonth').value = month;
+            document.getElementById('filterYear').value = year;
+            renderTable();
+            switchTab('review');
+        };
+
+        function complianceBadge(pct) {
+            if (pct === null) return '<span class="badge badge-err">—</span>';
+            if (pct >= 100) return '<span class="badge badge-ok">' + pct + '%</span>';
+            if (pct >= 90) return '<span class="badge badge-warn">' + pct + '%</span>';
+            return '<span class="badge badge-err">' + pct + '%</span>';
+        }
+
+        function renderAuditDashboard() {
+            if (!document.getElementById('auditKpis')) return;
+            const units = auditUnitsInScope();
+            const months = auditMonthsInScope();
+            const onlyEx = document.getElementById('auditOnlyExceptions').checked;
+
+            const exceptions = runAuditChecks(units, months);
+            const errCount = exceptions.filter(x => x.severity === 'err').length;
+
+            // --- KPI cards ---
+            let totExpected = 0, totDocumented = 0, totFully = 0, totPass = 0;
+            units.forEach(u => months.forEach(({ month, year }) => {
+                const c = complianceFor(u, month, year);
+                totExpected += c.expected; totDocumented += c.documented; totFully += c.fully;
+                totPass += allEntries.filter(e => e.unit === u && e.month === month && e.year === year && testPassed(e)).length;
+            }));
+            const overallPct = totExpected ? Math.round(100 * totFully / totExpected) : null;
+            const passRate = totDocumented ? Math.round(100 * totPass / totDocumented) : null;
+            const kpi = (label, value, sub, badgeCls) =>
+                '<div class="bg-white border border-line rounded-lg p-3"><div class="text-xs text-muted mb-1">' + label + '</div>' +
+                '<div class="text-xl font-semibold tnum ' + (badgeCls || 'text-ink') + '">' + value + '</div>' +
+                (sub ? '<div class="text-xs text-faint mt-0.5">' + sub + '</div>' : '') + '</div>';
+            document.getElementById('auditKpis').innerHTML =
+                kpi('Overall compliance', overallPct === null ? '—' : overallPct + '%', totFully + ' fully compliant days',
+                    overallPct === null ? '' : overallPct >= 100 ? 'text-emerald-700' : overallPct >= 90 ? 'text-amber-700' : 'text-red-700') +
+                kpi('Days documented / expected', totDocumented + ' / ' + totExpected, 'across selected scope') +
+                kpi('Defib test pass rate', passRate === null ? '—' : passRate + '%', totPass + ' of ' + totDocumented + ' documented days',
+                    passRate === null ? '' : passRate >= 99 ? 'text-emerald-700' : 'text-amber-700') +
+                kpi('Open exceptions', errCount, exceptions.length + ' total incl. warnings', errCount ? 'text-red-700' : 'text-emerald-700');
+
+            // --- Per-unit matrix ---
+            const monthCols = months;
+            let thead = '<thead class="bg-surface"><tr><th class="px-3 py-3 text-left font-medium text-muted uppercase text-xs tracking-wider">Unit</th>';
+            monthCols.forEach(({ month }) => { thead += '<th class="px-3 py-3 text-center font-medium text-muted uppercase text-xs tracking-wider">' + esc(MONTH_NAMES[parseInt(month, 10)].slice(0, 3)) + '</th>'; });
+            thead += '</tr></thead>';
+            let tbody = '<tbody class="bg-white divide-y divide-line">';
+            let cardsHtml = '';
+            units.forEach(u => {
+                tbody += '<tr><td class="px-3 py-2 font-semibold">' + esc(UNIT_LABELS[u] || u) + '</td>';
+                let bars = '';
+                monthCols.forEach(({ month, year }) => {
+                    const c = complianceFor(u, month, year);
+                    tbody += '<td class="px-3 py-2 text-center">' + complianceBadge(c.pct) + '</td>';
+                    const w = c.pct === null ? 0 : c.pct;
+                    const cls = c.pct === null ? 'bg-stone-200' : c.pct >= 100 ? 'bg-brand-600' : c.pct >= 90 ? 'bg-amber-400' : 'bg-red-500';
+                    bars += '<div class="flex items-center gap-2 text-xs"><span class="w-10 text-muted tnum">' + esc(MONTH_NAMES[parseInt(month, 10)].slice(0, 3)) + '</span>' +
+                        '<div class="flex-grow h-2 bg-stone-100 rounded"><div class="h-2 rounded ' + cls + '" style="width:' + Math.min(100, w) + '%"></div></div>' +
+                        '<span class="tnum w-10 text-right">' + (c.pct === null ? '—' : c.pct + '%') + '</span></div>';
+                });
+                tbody += '</tr>';
+                cardsHtml += '<div class="bg-white border border-line rounded-lg p-3"><div class="font-semibold text-ink mb-2">' + esc(UNIT_LABELS[u] || u) + '</div><div class="space-y-1.5">' + bars + '</div></div>';
+            });
+            tbody += '</tbody>';
+            document.getElementById('auditMatrixTable').innerHTML = thead + tbody;
+            document.getElementById('auditMatrixCards').innerHTML = cardsHtml;
+
+            // --- Heat strip (specific unit+month; fall back to first unit with data) ---
+            let heatUnit = document.getElementById('auditUnit').value;
+            let heatMonth = document.getElementById('auditMonth').value;
+            const heatYear = document.getElementById('auditYear').value;
+            if (heatMonth === 'all') heatMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+            if (heatUnit === 'all') {
+                heatUnit = AUDIT_UNITS.find(u => allEntries.some(e => e.unit === u && e.month === heatMonth && e.year === heatYear)) || 'a';
+            }
+            const { daysInMonth, entries: hEntries } = monthCompletion(allEntries, heatUnit, heatMonth, heatYear);
+            const byDay = {};
+            hEntries.forEach(e => { byDay[parseInt(e.day, 10)] = e; });
+            const today = new Date();
+            let strip = '';
+            for (let d = 1; d <= daysInMonth; d++) {
+                const cellDate = new Date(parseInt(heatYear, 10), parseInt(heatMonth, 10) - 1, d);
+                const isFuture = cellDate.getTime() > today.getTime();
+                const e = byDay[d];
+                let cls, title;
+                if (isFuture) { cls = 'bg-stone-100 text-faint border border-line'; title = 'Day ' + d + ': upcoming'; }
+                else if (e && entryFullyCompliant(e)) { cls = 'bg-brand-600 text-white'; title = 'Day ' + d + ': compliant'; }
+                else if (e) { cls = 'bg-amber-400 text-white'; title = 'Day ' + d + ': documented but incomplete (' + entryCheckCount(e) + '/7 checks' + (testPassed(e) ? '' : ', no Pass') + ')'; }
+                else { cls = 'bg-white text-red-700 border-2 border-red-400'; title = 'Day ' + d + ': missing'; }
+                strip += '<div class="h-8 rounded flex items-center justify-center text-xs tnum ' + cls + '" title="' + esc(title) + '">' + d + '</div>';
+            }
+            document.getElementById('auditHeatTitle').textContent = 'Daily Heat Strip — ' + (UNIT_LABELS[heatUnit] || heatUnit) + ' · ' + MONTH_NAMES[parseInt(heatMonth, 10)] + ' ' + heatYear;
+            document.getElementById('auditHeatStrip').innerHTML = strip;
+
+            // --- 6-month trend ---
+            const trend = [];
+            let tm = today.getMonth() + 1, ty = today.getFullYear();
+            tm--; if (tm === 0) { tm = 12; ty--; } // start with last completed month
+            for (let i = 0; i < 6; i++) {
+                const mm = String(tm).padStart(2, '0');
+                let e2 = 0, f2 = 0;
+                units.forEach(u => { const c = complianceFor(u, mm, String(ty)); e2 += c.expected; f2 += c.fully; });
+                trend.unshift({ label: MONTH_NAMES[tm].slice(0, 3) + ' ' + String(ty).slice(2), pct: e2 ? Math.round(100 * f2 / e2) : null });
+                tm--; if (tm === 0) { tm = 12; ty--; }
+            }
+            document.getElementById('auditTrend').innerHTML = trend.map(t => {
+                const h = t.pct === null ? 0 : Math.max(3, t.pct);
+                const cls = t.pct === null ? 'bg-stone-200' : t.pct >= 100 ? 'bg-brand-600' : t.pct >= 90 ? 'bg-amber-400' : 'bg-red-500';
+                return '<div class="flex flex-col items-center justify-end flex-1 h-full min-w-0">' +
+                    '<div class="text-xs tnum text-muted mb-1">' + (t.pct === null ? '—' : t.pct + '%') + '</div>' +
+                    '<div class="w-full max-w-12 rounded-t ' + cls + '" style="height:' + h + '%" title="' + esc(t.label) + ': ' + (t.pct === null ? 'no data' : t.pct + '%') + '"></div>' +
+                    '<div class="text-xs text-muted mt-1 truncate">' + esc(t.label) + '</div></div>';
+            }).join('');
+
+            // --- Exceptions panel ---
+            const shown = onlyEx ? exceptions.filter(x => x.severity === 'err') : exceptions;
+            document.getElementById('auditExceptionCount').textContent = exceptions.length;
+            document.getElementById('auditExceptions').innerHTML = shown.length
+                ? shown.slice(0, 100).map(auditExceptionRow).join('') +
+                  (shown.length > 100 ? '<div class="text-xs text-muted text-center py-2">Showing first 100 of ' + shown.length + '</div>' : '')
+                : '<div class="border border-line rounded-lg p-6 text-center text-sm text-muted">No exceptions in the selected scope. <span class="badge badge-ok ml-1">All clear</span></div>';
+
+            renderLeaderAudit();
+        }
+
+        // ========== LEADER AUDIT TOOL ==========
+        function leaderAuditScope() {
+            const unit = document.getElementById('auditUnit').value;
+            const month = document.getElementById('auditMonth').value;
+            const year = document.getElementById('auditYear').value;
+            if (unit === 'all' || month === 'all') return null;
+            return { unit: unit, month: month, year: year };
+        }
+
+        function computeLeaderAudit(unit, month, year) {
+            const { daysInMonth, entries } = monthCompletion(allEntries, unit, month, year);
+            const documented = entries.length;
+            const fully = entries.filter(entryFullyCompliant).length;
+            const pct = daysInMonth ? Math.round(100 * fully / daysInMonth) : null;
+            const allDaysDone = documented >= daysInMonth;
+            const allFields = documented > 0 && entries.every(e => e.lock1 && e.lock2 && e.expDate);
+            const allStaff = documented > 0 && entries.every(e => e.staffName && String(e.staffName).trim());
+            const sameUnit = entries.every(e => e.unit === unit);
+            return { expected: daysInMonth, documented: documented, fully: fully, pct: pct,
+                     s1: { allDays: allDaysDone, allFields: allFields, allStaff: allStaff, sameUnit: sameUnit } };
+        }
+
+        let leaderAuditTouched = false;
+        ['laDepartment','laUnitLocation','laAssetTag','laAuditor','laResponsibleLeader'].forEach(id => {
+            document.addEventListener('input', ev => { if (ev.target && ev.target.id === id) leaderAuditTouched = true; });
+        });
+
+        function renderLeaderAudit() {
+            const scope = leaderAuditScope();
+            const body = document.getElementById('leaderAuditBody');
+            if (!scope) {
+                body.style.opacity = '0.5';
+                body.style.pointerEvents = 'none';
+                document.getElementById('laSection1').innerHTML = '';
+                document.getElementById('laSection2').innerHTML = '<tr><td colspan="2" class="px-3 py-4 text-center text-muted">Select a specific unit and month in the filters above to run the leader audit.</td></tr>';
+                document.getElementById('laVerdict').innerHTML = '';
+                return;
+            }
+            body.style.opacity = '';
+            body.style.pointerEvents = '';
+            const c = computeLeaderAudit(scope.unit, scope.month, scope.year);
+            const monthName = MONTH_NAMES[parseInt(scope.month, 10)];
+
+            if (!leaderAuditTouched) {
+                document.getElementById('laUnitLocation').value = UNIT_LABELS[scope.unit] || scope.unit;
+                document.getElementById('laAuditor').value = currentUser ? currentUser.email : '';
+                document.getElementById('laAuditDate').value = new Date().toISOString().split('T')[0];
+            }
+            document.getElementById('laMonthYear').value = monthName + ' ' + scope.year;
+
+            const yn = v => v
+                ? '<td class="px-3 py-2 text-center"><span class="badge badge-ok">Yes</span></td><td class="px-3 py-2 text-center text-faint">—</td>'
+                : '<td class="px-3 py-2 text-center text-faint">—</td><td class="px-3 py-2 text-center"><span class="badge badge-err">No</span></td>';
+            const s1row = (label, v) => '<tr><td class="px-3 py-2 text-sm">' + label + '</td>' + yn(v) + '</tr>';
+            document.getElementById('laSection1').innerHTML =
+                s1row('Daily checks completed for all applicable days', c.s1.allDays) +
+                s1row('All required fields completed for each day', c.s1.allFields) +
+                s1row('Staff initials present for each daily entry', c.s1.allStaff) +
+                s1row('Log matches assigned defibrillator/location', c.s1.sameUnit);
+
+            const s2row = (label, v) => '<tr><td class="px-3 py-2 text-sm">' + label + '</td><td class="px-3 py-2 font-semibold">' + v + '</td></tr>';
+            document.getElementById('laSection2').innerHTML =
+                s2row('Total Days Expected This Month', c.expected) +
+                s2row('Days Completed', c.documented) +
+                s2row('Days Fully Compliant', c.fully) +
+                s2row('Monthly Compliance Percentage', c.pct === null ? '—' : c.pct + '%');
+
+            let verdict, cls;
+            if (c.pct === null) { verdict = 'No data'; cls = 'badge-warn'; }
+            else if (c.pct >= 100) { verdict = '≥ 100% — Meets Compliance Goal'; cls = 'badge-ok'; }
+            else if (c.pct >= 99) { verdict = c.pct + '% — Near goal (99–99.9%)'; cls = 'badge-warn'; }
+            else { verdict = c.pct + '% — < 99% — Action Required'; cls = 'badge-err'; }
+            document.getElementById('laVerdict').innerHTML = '<span class="badge ' + cls + ' !text-sm !px-3 !py-1">' + esc(verdict) + '</span>';
+        }
+
+        async function saveLeaderAudit() {
+            const scope = leaderAuditScope();
+            if (!scope) return showToast('Select a specific unit and month first.', true);
+            if (!currentUser) return showToast('You must be logged in.', true);
+            const c = computeLeaderAudit(scope.unit, scope.month, scope.year);
+            const leaderAudit = {
+                department: document.getElementById('laDepartment').value,
+                unitLocation: document.getElementById('laUnitLocation').value,
+                assetTag: document.getElementById('laAssetTag').value,
+                monthYearAudited: document.getElementById('laMonthYear').value,
+                auditor: document.getElementById('laAuditor').value,
+                auditDate: document.getElementById('laAuditDate').value,
+                responsibleLeader: document.getElementById('laResponsibleLeader').value,
+                section1: c.s1,
+                expected: c.expected, documented: c.documented, fullyCompliant: c.fully, compliancePct: c.pct,
+                auditedAt: Date.now(), auditedBy: currentUser.email
+            };
+            const formId = 'form_' + scope.unit + '_' + scope.month + '_' + scope.year;
+            const btn = document.getElementById('laSaveBtn');
+            btn.disabled = true;
+            try {
+                await setDoc(doc(db, 'monthly_forms', formId), { leaderAudit: leaderAudit }, { merge: true });
+                if (savedFormsMeta[formId]) savedFormsMeta[formId].leaderAudit = leaderAudit;
+                showToast('Leader audit saved to the monthly form.');
+            } catch (err) {
+                console.error('Leader audit save failed:', err);
+                if (err && err.code === 'permission-denied') {
+                    showToast('Could not persist: Firestore rules deny monthly_forms writes. The calculated audit above remains usable; ask the admin to update the rules.', true);
+                } else {
+                    showToast('Leader audit save failed: ' + (err && err.message ? err.message : 'unknown error'), true);
+                }
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function printLeaderAudit() {
+            const scope = leaderAuditScope();
+            if (!scope) return showToast('Select a specific unit and month first.', true);
+            const c = computeLeaderAudit(scope.unit, scope.month, scope.year);
+            const ynBox = v => (v ? '☑' : '☐'), nnBox = v => (v ? '☐' : '☑');
+            const g = id => esc(document.getElementById(id).value);
+            const s1 = [
+                ['Daily checks completed for all applicable days', c.s1.allDays],
+                ['All required fields completed for each day', c.s1.allFields],
+                ['Staff initials present for each daily entry', c.s1.allStaff],
+                ['Log matches assigned defibrillator/location', c.s1.sameUnit]
+            ];
+            let verdictLine;
+            if (c.pct === null) verdictLine = 'No data';
+            else if (c.pct >= 100) verdictLine = '☑ ≥ 100% — Meets Compliance Goal';
+            else if (c.pct >= 99) verdictLine = '☐ ≥ 100% goal not met — ' + c.pct + '% (99–99.9% warning)';
+            else verdictLine = '☑ < 99% — Action Required (' + c.pct + '%)';
+            const html = '<div class="monthly-form">' +
+                '<h2>LEADER AUDIT TOOL – DEFIBRILLATOR MONTHLY REVIEW</h2>' +
+                '<table style="font-size:12px;margin-bottom:12px;"><tbody>' +
+                '<tr><td style="border:none;text-align:left;"><strong>Department</strong></td><td style="border:none;text-align:left;">' + g('laDepartment') + '</td></tr>' +
+                '<tr><td style="border:none;text-align:left;"><strong>Unit / Location</strong></td><td style="border:none;text-align:left;">' + g('laUnitLocation') + '</td></tr>' +
+                '<tr><td style="border:none;text-align:left;"><strong>Defibrillator Asset Tag</strong></td><td style="border:none;text-align:left;">' + g('laAssetTag') + '</td></tr>' +
+                '<tr><td style="border:none;text-align:left;"><strong>Month / Year Audited</strong></td><td style="border:none;text-align:left;">' + g('laMonthYear') + '</td></tr>' +
+                '<tr><td style="border:none;text-align:left;"><strong>Auditor Name &amp; Title</strong></td><td style="border:none;text-align:left;">' + g('laAuditor') + '</td></tr>' +
+                '<tr><td style="border:none;text-align:left;"><strong>Date of Audit</strong></td><td style="border:none;text-align:left;">' + g('laAuditDate') + '</td></tr>' +
+                '</tbody></table>' +
+                '<h2 style="text-align:left;font-size:14px;">1. Documentation Completeness Review</h2>' +
+                '<table><thead><tr><th style="text-align:left;">Criteria</th><th>Yes</th><th>No</th></tr></thead><tbody>' +
+                s1.map(r => '<tr><td style="text-align:left;">' + r[0] + '</td><td>' + ynBox(r[1]) + '</td><td>' + nnBox(r[1]) + '</td></tr>').join('') +
+                '</tbody></table>' +
+                '<h2 style="text-align:left;font-size:14px;margin-top:12px;">2. Compliance Calculation</h2>' +
+                '<table><thead><tr><th style="text-align:left;">Metric</th><th>Value</th></tr></thead><tbody>' +
+                '<tr><td style="text-align:left;">Total Days Expected This Month</td><td>' + c.expected + '</td></tr>' +
+                '<tr><td style="text-align:left;">Days Completed</td><td>' + c.documented + '</td></tr>' +
+                '<tr><td style="text-align:left;">Days Fully Compliant</td><td>' + c.fully + '</td></tr>' +
+                '<tr><td style="text-align:left;">Monthly Compliance Percentage</td><td>' + (c.pct === null ? '—' : c.pct + '%') + '</td></tr>' +
+                '</tbody></table>' +
+                '<div style="margin-top:10px;font-size:12px;">' + esc(verdictLine) + '</div>' +
+                '<div style="margin-top:10px;font-size:12px;"><strong>Responsible Leader:</strong> ' + g('laResponsibleLeader') + '</div>' +
+                '<div style="margin-top:6px;font-size:11px;">Target Completion Date is the 9th of each month.</div>' +
+                '</div>';
+            const printArea = document.getElementById('printArea');
+            printArea.innerHTML = html;
+            printArea.classList.remove('hidden');
+            setTimeout(() => { window.print(); printArea.classList.add('hidden'); }, 150);
         }
 
     </script>
