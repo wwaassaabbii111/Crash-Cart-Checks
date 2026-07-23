@@ -33,7 +33,8 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <style>
         .tab-content { display: none; }
@@ -106,6 +107,11 @@
             .monthly-form-scroll { overflow-x: auto; }
             .monthly-form-scroll .monthly-form table { min-width: 720px; }
         }
+        /* DOCX template preview (docx-preview): page-sheet look, internal scrolling */
+        .docx-host .docx-wrapper { background: transparent; padding: 8px 0; }
+        .docx-host .docx-wrapper > section.docx { box-shadow: 0 1px 4px rgba(0,0,0,.25); margin: 0 auto 12px auto; }
+        .docx-loading { display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 3rem 1rem; color: #57534e; font-size: 0.9375rem; }
+        .docx-error { margin: 1rem; padding: 1rem; border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; border-radius: 0.5rem; font-size: 0.875rem; }
         .day-col { width: 30px; }
         .time-col { width: 45px; }
         .lock-col { width: 70px; }
@@ -553,6 +559,11 @@
                 <p class="text-sm text-muted mb-4">
                     <strong>If the crash cart log is ever revised</strong>, simply upload the new Word file below.
                     As long as it keeps the same day-row table layout (days 1–31 in the first column), it will work immediately — no recalibration required.
+                </p>
+                <p class="text-sm text-muted mb-4">
+                    <i class="fa-solid fa-circle-info mr-1"></i>
+                    The active template is the base for <strong>everything</strong>: Monthly Review preview, Monthly Forms previews,
+                    Word downloads, PDF downloads, and Print all render this exact Word form. Uploading or resetting takes effect immediately — no reload needed.
                 </p>
 
                 <div id="docxTemplateInfo" class="text-sm bg-surface border border-line rounded-lg p-3 mb-4 text-ink"></div>
@@ -1184,17 +1195,66 @@
         let docViewerContext = null; // { unit, month, year }
         let docViewerReturnFocus = null;
 
-        function openDocViewer(unit, month, year, formHtmlOverride) {
-            const html = formHtmlOverride || generateMonthlyFormHTML(unit, month, year, allEntries);
-            docViewerContext = { unit, month, year };
+        function docxPreviewAvailable() {
+            return !!(window.docx && typeof window.docx.renderAsync === 'function');
+        }
+
+        // Render a filled DOCX blob into a container using docx-preview. Throws on failure.
+        async function renderDocxBlob(blob, container) {
+            if (!docxPreviewAvailable()) {
+                throw new Error('Document preview library (docx-preview) failed to load. Check your connection and reload the page.');
+            }
+            container.innerHTML = '';
+            await window.docx.renderAsync(blob, container, null, {
+                className: 'docx',           // pages: <section class="docx">; wrapper: .docx-wrapper
+                inWrapper: true,
+                ignoreWidth: false,
+                ignoreHeight: false,
+                breakPages: true
+            });
+        }
+
+        // Primary viewer: the filled Word template is the form. options:
+        //   docxBlob   - render this archived DOCX snapshot instead of regenerating
+        //   archived   - title flag for stored snapshots
+        //   legacyHtml - last-resort fallback for old saved forms without a docx or live entries
+        // Returns a promise that resolves once rendering (or fallback) finished.
+        async function openDocViewer(unit, month, year, options) {
+            options = options || {};
+            docViewerContext = { unit: unit, month: month, year: year };
             docViewerReturnFocus = document.activeElement;
             const monthName = MONTH_NAMES[parseInt(month, 10)] || month;
-            document.getElementById('docViewerTitle').textContent =
-                'Monthly Form - Unit ' + String(unit).toUpperCase() + ' ' + monthName + ' ' + year;
-            document.getElementById('docViewerBody').innerHTML = html;
+            const base = 'Unit ' + String(unit).toUpperCase() + ' ' + monthName + ' ' + year;
+            const legacyOnly = options.legacyHtml && !options.docxBlob && !allEntries.some(e => e.unit === unit && e.month === month && e.year === year);
+            document.getElementById('docViewerTitle').textContent = legacyOnly
+                ? 'Monthly Form (Legacy HTML) - ' + base
+                : (options.archived ? 'Word Template Preview (Archived) - ' : 'Word Template Preview - ') + base;
+            const body = document.getElementById('docViewerBody');
+            body.classList.add('docx-host');
             document.getElementById('docViewerModal').classList.remove('hidden');
             document.body.style.overflow = 'hidden';
             document.getElementById('docViewerCloseBtn').focus();
+
+            if (legacyOnly) {
+                // Old archived form with stored HTML but no DOCX and no live entries.
+                body.innerHTML = options.legacyHtml;
+                return;
+            }
+
+            body.innerHTML = '<div class="docx-loading"><i class="fa-solid fa-spinner fa-spin"></i> Rendering Word template preview...</div>';
+            try {
+                const blob = options.docxBlob || await buildMonthlyDocx(unit, month, year, allEntries);
+                docViewerContext.docxBlob = blob;
+                await renderDocxBlob(blob, body);
+            } catch (err) {
+                console.error('Template preview error:', err);
+                if (options.legacyHtml) {
+                    body.innerHTML = options.legacyHtml;
+                } else {
+                    body.innerHTML = '<div class="docx-error"><strong>Could not render the Word template preview:</strong> ' + esc(err.message || String(err)) + '</div>';
+                }
+                showToast('Template preview failed: ' + (err.message || err), true);
+            }
         }
 
         function closeDocViewer() {
@@ -1213,16 +1273,22 @@
         });
 
         function openCurrentMonthViewer() {
-            openDocViewer(
+            return openDocViewer(
                 document.getElementById('filterUnit').value,
                 document.getElementById('filterMonth').value,
                 document.getElementById('filterYear').value
             );
         }
 
+        // Prints the rendered Word-template content currently in the viewer.
         function printDocViewer() {
+            const viewerBody = document.getElementById('docViewerBody');
+            if (!viewerBody.querySelector('.docx-wrapper')) {
+                showToast('Open a Word template preview first, then print.', true);
+                return;
+            }
             const printArea = document.getElementById('printArea');
-            printArea.innerHTML = document.getElementById('docViewerBody').innerHTML;
+            printArea.innerHTML = viewerBody.innerHTML;
             printArea.classList.remove('hidden');
             setTimeout(() => {
                 window.print();
@@ -1230,76 +1296,87 @@
             }, 150);
         }
 
-        function printCurrentMonthViewer() {
-            openCurrentMonthViewer();
+        // Print button: render the selected month from the active template first, then print it.
+        async function printCurrentMonthViewer() {
+            await openCurrentMonthViewer();
             printDocViewer();
         }
 
-        // ========== DIRECT PDF DOWNLOAD (jsPDF + AutoTable, no window.print) ==========
-        function downloadMonthlyPdf(unit, month, year, entries) {
+        // ========== TEMPLATE-FIRST PDF (filled DOCX -> docx-preview -> html2canvas -> jsPDF) ==========
+        async function downloadMonthlyPdf(unit, month, year, entries, docxBlob) {
             if (!window.jspdf || !window.jspdf.jsPDF) {
                 showToast('PDF library failed to load. Check your connection and try again.', true);
                 return;
             }
+            if (!docxPreviewAvailable() || typeof html2canvas !== 'function') {
+                showToast('Document rendering libraries failed to load. Check your connection and reload the page.', true);
+                return;
+            }
+            showToast('Generating PDF from the Word template...');
+            const holder = document.createElement('div');
+            holder.style.cssText = 'position:fixed;left:-10000px;top:0;z-index:-1;background:#ffffff;';
+            document.body.appendChild(holder);
             try {
-                const monthName = MONTH_NAMES[parseInt(month, 10)] || month;
-                const { daysInMonth, entries: matching, isComplete } = monthCompletion(entries, unit, month, year);
-                const entryByDay = {};
-                matching.forEach(e => entryByDay[e.day] = e);
-
-                // jsPDF's built-in Helvetica does not embed the Unicode ballot-box glyphs.
-                // Use PDF-safe X/blank marks here; the Word file still uses ☑/☐.
-                const CHK = 'X', UNCHK = '';
-                const body = [];
-                for (let d = 1; d <= daysInMonth; d++) {
-                    const e = entryByDay[d];
-                    const cb = v => (v ? CHK : UNCHK);
-                    if (e) {
-                        body.push([String(d), e.time || '', e.lock1 || '', e.lock2 || '', e.expDate || '',
-                            cb(e.cb1), cb(e.cb2), cb(e.cb3), cb(e.cb4), cb(e.cb5), cb(e.cb6),
-                            cb(e.cb7), testPassed(e) ? 'Pass' : '', cb(e.cb7), e.staffName || '']);
+                const blob = docxBlob || await buildMonthlyDocx(unit, month, year, entries);
+                await renderDocxBlob(blob, holder);
+                // docx-preview emits one <section class="docx"> per rendered page.
+                const pages = holder.querySelectorAll('section.docx');
+                const targets = pages.length ? Array.from(pages) : [holder.firstElementChild || holder];
+                let pdfDoc = null;
+                for (let i = 0; i < targets.length; i++) {
+                    const canvas = await html2canvas(targets[i], { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+                    const img = canvas.toDataURL('image/jpeg', 0.95);
+                    const landscape = canvas.width >= canvas.height;
+                    if (!pdfDoc) {
+                        pdfDoc = new window.jspdf.jsPDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'pt', format: 'letter' });
                     } else {
-                        body.push([String(d), '', '', '', '', UNCHK, UNCHK, UNCHK, UNCHK, UNCHK, UNCHK, UNCHK, '', UNCHK, '']);
+                        pdfDoc.addPage('letter', landscape ? 'landscape' : 'portrait');
                     }
+                    const pw = pdfDoc.internal.pageSize.getWidth();
+                    const ph = pdfDoc.internal.pageSize.getHeight();
+                    const s = Math.min(pw / canvas.width, ph / canvas.height);
+                    pdfDoc.addImage(img, 'JPEG', (pw - canvas.width * s) / 2, (ph - canvas.height * s) / 2, canvas.width * s, canvas.height * s);
                 }
-
-                const docPdf = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
-                docPdf.setFontSize(14);
-                docPdf.text('CRASH CART & DEFIBRILLATOR DAILY CHECK', docPdf.internal.pageSize.getWidth() / 2, 30, { align: 'center' });
-                docPdf.setFontSize(11);
-                docPdf.text(
-                    'Unit: ' + String(unit).toUpperCase() + '    Month: ' + monthName + '    Year: ' + year +
-                    '    Status: ' + (isComplete ? 'Complete' : 'Running (' + matching.length + ' entries)'),
-                    docPdf.internal.pageSize.getWidth() / 2, 48, { align: 'center' });
-                docPdf.autoTable({
-                    startY: 60,
-                    head: [['Day','Time','Lock #1','Lock #2','Exp Date','C1','C2','C3','C4','C5','C6','Power','Test Result','O2','Staff']],
-                    body: body,
-                    styles: { fontSize: 7, cellPadding: 2, halign: 'center' },
-                    headStyles: { fillColor: [19, 78, 74], fontSize: 7 },
-                    columnStyles: { 0: { cellWidth: 26 }, 14: { halign: 'left' } },
-                    theme: 'grid'
-                });
-                docPdf.save('CrashCart_' + String(unit).toUpperCase() + '_' + month + '_' + year + '.pdf');
+                pdfDoc.save('CrashCart_' + String(unit).toUpperCase() + '_' + month + '_' + year + '.pdf');
                 showToast('PDF downloaded!');
             } catch (err) {
                 console.error('PDF generation error:', err);
-                showToast('PDF generation failed: ' + err.message, true);
+                showToast('PDF generation failed: ' + (err.message || err), true);
+            } finally {
+                holder.remove();
             }
         }
 
-        function downloadCurrentMonthPdf() {
-            downloadMonthlyPdf(
-                document.getElementById('filterUnit').value,
-                document.getElementById('filterMonth').value,
-                document.getElementById('filterYear').value,
-                allEntries
-            );
+        async function downloadCurrentMonthPdf() {
+            const btn = document.getElementById('downloadPdfBtn');
+            btn.disabled = true;
+            try {
+                await downloadMonthlyPdf(
+                    document.getElementById('filterUnit').value,
+                    document.getElementById('filterMonth').value,
+                    document.getElementById('filterYear').value,
+                    allEntries
+                );
+            } finally {
+                btn.disabled = false;
+            }
         }
 
-        function downloadViewerPdf() {
+        async function downloadViewerPdf() {
             if (!docViewerContext) return;
-            downloadMonthlyPdf(docViewerContext.unit, docViewerContext.month, docViewerContext.year, allEntries);
+            const btn = document.getElementById('docViewerPdfBtn');
+            btn.disabled = true;
+            try {
+                await downloadMonthlyPdf(
+                    docViewerContext.unit,
+                    docViewerContext.month,
+                    docViewerContext.year,
+                    allEntries,
+                    docViewerContext.docxBlob || null
+                );
+            } finally {
+                btn.disabled = false;
+            }
         }
 
         // ========== RUNNING MONTHLY FORM AUTO-SAVE ==========
@@ -1558,9 +1635,18 @@
                 const snap = await getDoc(doc(db, 'monthly_forms', formId));
                 if (!snap.exists()) return showToast("Form not found.", true);
                 const data = snap.data();
-                // Prefer live entries for the month; fall back to the stored HTML snapshot.
-                const hasLive = allEntries.some(e => e.unit === data.unit && e.month === data.month && e.year === data.year);
-                openDocViewer(data.unit, data.month, data.year, hasLive ? null : data.formHTML);
+                // Priority: archived DOCX snapshot -> live entries regenerated from the active
+                // template -> legacy stored HTML (old archives only).
+                if (data.formDocxBase64) {
+                    openDocViewer(data.unit, data.month, data.year, {
+                        docxBlob: base64ToBlob(data.formDocxBase64, DOCX_MIME),
+                        archived: true,
+                        legacyHtml: data.formHTML
+                    });
+                } else {
+                    const hasLive = allEntries.some(e => e.unit === data.unit && e.month === data.month && e.year === data.year);
+                    openDocViewer(data.unit, data.month, data.year, hasLive ? {} : { legacyHtml: data.formHTML });
+                }
             } catch (err) {
                 showToast("Error opening form: " + err.message, true);
             }
@@ -1923,7 +2009,7 @@
                 localStorage.setItem(DOCX_LS_KEY, b64);
                 localStorage.setItem(DOCX_LS_META_KEY, JSON.stringify({ name: file.name, date: new Date().toLocaleString() }));
                 refreshTemplateStatus();
-                showToast("New Word template saved and validated!");
+                showToast("New template saved! Preview, Word, PDF, and Print now use it.");
             } catch (err) {
                 errEl.innerHTML = '<strong>Template rejected:</strong> ' + err.message;
                 errEl.classList.remove('hidden');
@@ -1937,7 +2023,7 @@
             localStorage.removeItem(DOCX_LS_META_KEY);
             document.getElementById('docxUploadError').classList.add('hidden');
             refreshTemplateStatus();
-            showToast("Reverted to default template.");
+            showToast("Reverted to default template. Preview, Word, PDF, and Print now use it.");
         }
 
         async function downloadCurrentTemplate() {
